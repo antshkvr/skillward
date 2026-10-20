@@ -47,7 +47,9 @@ async function hashFile(absPath: string): Promise<string> {
   return `sha256:${hash.digest("hex")}`;
 }
 
-function fileKey(target: Target, displayPath: string): string {
+function fileKey(target: Target, displayPath: string, hookTarget: boolean): string {
+  // Hook scripts can share a basename (two `run.sh` in different folders): keep their project-relative path.
+  if (hookTarget) return displayPath;
   if (target.kind !== "skill") return posix.basename(displayPath);
   return target.path === "." ? displayPath : displayPath.slice(target.path.length + 1);
 }
@@ -61,7 +63,7 @@ async function currentEntries(root: string, config: Config): Promise<CurrentEntr
     for (const f of target.files) {
       // The lock's own state must never be part of what it locks (matters when the root is a skill).
       if (f.path === LOCK_FILE_NAME || f.path.startsWith(".skillward/")) continue;
-      files.set(fileKey(target, f.path), { absPath: f.absPath, displayPath: f.path, hash: await hashFile(f.absPath) });
+      files.set(fileKey(target, f.path, Boolean(f.hookTarget)), { absPath: f.absPath, displayPath: f.path, hash: await hashFile(f.absPath) });
     }
     if (files.size) entries.push({ path: target.path, kind: target.kind, files });
   }

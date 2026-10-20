@@ -27,6 +27,27 @@ export interface SourceFile {
   absPath: string;
   /** Path shown to the user: relative to the scan root, forward slashes (or `~/.claude/...`). */
   path: string;
+  /** Set when the file is a script that a hook in the same target runs (see discovery). */
+  hookTarget?: HookTargetRef;
+}
+
+export interface HookTargetRef {
+  /** Hook events that run it, e.g. `SessionStart`. */
+  events: string[];
+  /** Display path of the settings/hooks file that declares the hook. */
+  from: string;
+}
+
+/** What a hook target looks like, computed even when its content is too large or binary to scan. */
+export interface HookScriptInfo {
+  size: number;
+  lines: number;
+  maxLineLength: number;
+  binary: boolean;
+  /** Obfuscation signals found, e.g. `_0x identifiers`. */
+  signals: string[];
+  /** False when the file was too large or binary: only `HookScriptInfo` is available, `text` is empty. */
+  contentScanned: boolean;
 }
 
 /** A discovered scan target, before parsing. */
@@ -91,6 +112,8 @@ export interface ParsedFile extends SourceFile {
    * part is agent configuration, e.g. the `mcpServers` sections of `~/.claude.json` (the rest is history).
    */
   lineRanges?: Array<[number, number]>;
+  /** For hook targets: size, shape and obfuscation signals of the script. */
+  hookScript?: HookScriptInfo;
 }
 
 export interface ParsedTarget {

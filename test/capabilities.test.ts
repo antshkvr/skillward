@@ -51,6 +51,7 @@ describe("capabilitiesOf", () => {
     ["SW009", "Hides activity from the user", ["concealment"]],
     ["SW011", "MCP server runs pkg via npx without a version", ["autorun"]],
     ["SW016", "Contains a GitHub token.", ["secrets"]],
+    ["SW017", "Hook on SessionStart runs x.js: 4.6 MB with a packer.", ["autorun", "concealment"]],
     ["SW099", "a rule from the future", []],
   ])("%s %s → %j", (ruleId, message, expected) => {
     expect(capabilitiesOf(finding(ruleId, message))).toEqual(expected);

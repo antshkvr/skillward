@@ -13,6 +13,7 @@ import {
   type JsonObject,
 } from "./json-tree.js";
 import { parseMarkdown } from "./markdown.js";
+import { describeScript } from "./script-shape.js";
 import { detectScriptLanguage } from "./script.js";
 
 /** Files above this size are skipped: agent instructions are small, and this bounds memory use. */
@@ -31,6 +32,7 @@ export async function parseFile(source: SourceFile): Promise<ParseResult> {
   } catch (err) {
     return { ok: false, reason: `cannot read: ${errorMessage(err)}` };
   }
+  if (source.hookTarget) return parseHookTarget(source, size);
   const limit = basename(source.absPath) === CLAUDE_JSON ? MAX_CLAUDE_JSON_BYTES : MAX_FILE_BYTES;
   if (size > limit) return { ok: false, reason: `larger than ${limit} bytes` };
 
@@ -45,6 +47,41 @@ export async function parseFile(source: SourceFile): Promise<ParseResult> {
   let text = buffer.toString("utf8");
   if (text.charCodeAt(0) === 0xfeff) text = text.slice(1);
   return { ok: true, file: parseText(source, text) };
+}
+
+/** A hook target that big is not a script anyone reviewed; read it only to describe it. */
+export const MAX_HOOK_TARGET_BYTES = 64 * 1024 * 1024;
+
+/**
+ * Scripts that hooks run are described even when large or binary (SW017 needs their shape); their content is
+ * parsed for the other rules only within the usual text limit.
+ */
+async function parseHookTarget(source: SourceFile, size: number): Promise<ParseResult> {
+  if (size > MAX_HOOK_TARGET_BYTES) return { ok: false, reason: `larger than ${MAX_HOOK_TARGET_BYTES} bytes` };
+  let buffer: Buffer;
+  try {
+    buffer = await readFile(source.absPath);
+  } catch (err) {
+    return { ok: false, reason: `cannot read: ${errorMessage(err)}` };
+  }
+  const binary = isBinary(buffer);
+  const scannable = !binary && size <= MAX_FILE_BYTES;
+  const info = describeScript(buffer, binary, scannable);
+  if (!scannable) {
+    // Content isn't scanned, but the file still belongs to the target: SW017 reports its shape.
+    const file: ParsedFile = { ...source, type: "script", text: "", lineStarts: [0], script: { language: "unknown" }, hookScript: info };
+    return { ok: true, file };
+  }
+  let text = buffer.toString("utf8");
+  if (text.charCodeAt(0) === 0xfeff) text = text.slice(1);
+  const file = parseText(source, text);
+  file.hookScript = info;
+  if (file.type === "text") {
+    // A hook runs it, whatever its extension.
+    file.type = "script";
+    file.script = { language: "unknown" };
+  }
+  return { ok: true, file };
 }
 
 /** Parses already-loaded text. Exposed for tests. */

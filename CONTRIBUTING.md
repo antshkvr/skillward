@@ -35,6 +35,7 @@ scripts/corpus/     # collecting and scanning public agent configs (tuning again
 ## Rules of the road
 
 - **A new rule = module + fixtures + test.** At least 2 `bad` and 2 `good` fixtures; without them the rule isn't done.
+- **Fixtures must be committed:** a personal global gitignore often covers `.claude/settings.local.json` or `.env`; add such fixtures with `git add -f` (a test fails if a fixture is git-ignored).
 - **Precision before coverage.** False positives kill trust in the tool. If a rule is noisy, lower its confidence or
   narrow the pattern. When you find a false positive in the wild, turn its shape into a `good` fixture.
 - **Messages are short and plain:** what was found, why it's dangerous, what to do.

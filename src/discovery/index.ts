@@ -1,8 +1,9 @@
 import { lstat, readdir, readFile } from "node:fs/promises";
 import { homedir } from "node:os";
-import { basename, dirname, join, resolve, sep } from "node:path";
+import { basename, dirname, join, relative, resolve, sep } from "node:path";
 import ignore, { type Ignore } from "ignore";
 import type { SkippedFile, SourceFile, Target, TargetKind } from "../types.js";
+import { hookTargets } from "./hook-targets.js";
 
 export interface DiscoveryOptions {
   /** File or directory to scan. */
@@ -94,8 +95,47 @@ export async function discover(options: DiscoveryOptions): Promise<DiscoveryResu
     }
   }
 
+  await attachHookTargets(targets, root, options.global ? join(options.homeDir ?? homedir(), ".claude") : undefined, options.homeDir ?? homedir());
+
   targets.sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0));
   return { root, targets, skipped };
+}
+
+const HOOK_FILE = /(?:^|\/)(?:\.claude\/settings(?:\.local)?\.json|hooks\/hooks\.json|\.claude-plugin\/plugin\.json)$/;
+
+/**
+ * Adds the local scripts that hooks run to the hook file's target (see SPEC, "Hook targets"), so their content is
+ * scanned and locked. A script already in a target is left where it is.
+ */
+async function attachHookTargets(targets: Target[], root: string, globalClaudeDir: string | undefined, home: string): Promise<void> {
+  const owned = new Set(targets.flatMap((t) => t.files.map((f) => f.absPath)));
+  for (const target of targets) {
+    if (target.kind !== "settings" && target.kind !== "plugin-manifest") continue;
+    for (const file of [...target.files]) {
+      const forward = file.absPath.split(sep).join("/");
+      if (!HOOK_FILE.test(forward)) continue;
+      const global = globalClaudeDir !== undefined && file.path.startsWith("~/");
+      const scope = global ? globalClaudeDir! : root;
+      const added = new Map<string, SourceFile>();
+      for (const hook of await hookTargets(file.absPath, scope, home)) {
+        const existing = added.get(hook.absPath);
+        if (existing) {
+          if (!existing.hookTarget!.events.includes(hook.event)) existing.hookTarget!.events.push(hook.event);
+          continue;
+        }
+        if (owned.has(hook.absPath)) continue;
+        const rel = relative(scope, hook.absPath).split(sep).join("/");
+        const source: SourceFile = {
+          absPath: hook.absPath,
+          path: global ? `~/.claude/${rel}` : rel,
+          hookTarget: { events: [hook.event], from: file.path },
+        };
+        added.set(hook.absPath, source);
+        owned.add(hook.absPath);
+        target.files.push(source);
+      }
+    }
+  }
 }
 
 interface WalkOptions {

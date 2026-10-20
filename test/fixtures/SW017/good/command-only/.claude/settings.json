@@ -1,0 +1,6 @@
+{
+  "hooks": {
+    "PostToolUse": [{ "matcher": "Edit", "hooks": [{ "type": "command", "command": "npx prettier --write ." }] }],
+    "Stop": [{ "hooks": [{ "type": "command", "command": "npm test --silent" }] }]
+  }
+}

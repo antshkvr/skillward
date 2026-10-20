@@ -96,7 +96,7 @@ grouped per target into capabilities — runs code from the internet (SW004, SW0
 gives a remote host control (reverse shells), turns approvals off (SW008), reads credentials or secrets (SW005, SW006,
 SW016, embedded keys/tokens in SW003), sends data out or contacts unusual hosts (SW007, SW012, SW005/SW006 with egress, high
 SW013 hooks), persists after the session (SW014), can destroy data (SW015 destructive), hides things from you (SW001,
-SW002, SW009, encoded content in SW003/SW015), runs automatically (SW013, SW011). Each capability shows its worst
+SW002, SW009, SW017, encoded content in SW003/SW015), runs automatically (SW013, SW011, SW017). Each capability shows its worst
 severity and up to three distinct places (relative to the target). Targets are sorted worst first; targets with
 nothing notable are counted, and listed with `--all`. It is informational: exit `0` once printed, `2` on errors — CI
 gates on `scan --fail-on`. JSON (`--format json`) has its own format version (`1`): `{ version, tool, root, targets:
@@ -139,6 +139,13 @@ discovery  →  parsers  →  rule engine  →  reporters
   - `--global` only looks at `CLAUDE.md`, `settings*.json`, `skills/`, `agents/`, `commands/`, `plugins/` in
     `~/.claude` — transcripts, caches and todos are left alone.
   - Files over 2 MB and binary files (a NUL in the first 8 KB) are skipped and listed in `skipped`.
+  - **Hook targets.** A command hook in a `settings` target or plugin hooks file that runs a local script
+    (`node .github/setup.js`, `"${CLAUDE_PROJECT_DIR}"/.claude/hooks/x.sh`, `${CLAUDE_PLUGIN_ROOT}/hooks/run.sh`, `bash
+    scripts/x.sh`) adds that script to the same target: every rule scans its content, `lock` pins it, `explain` counts it.
+    The path is resolved against the project (the folder holding `.claude/`) or the plugin root, must stay inside the
+    scan root, is never a symlink, and a file already in another target isn't added twice. Hook targets are read even
+    when large or binary, to describe them (size, longest line, binary, obfuscation signals) for SW017; their content
+    is scanned only if it fits the usual 2 MB text limit. Gitignore doesn't hide a referenced script.
 - **parsers** — markdown: frontmatter, body, extracted code blocks and HTML comments; JSON: a tree; scripts: text plus
   a language from the extension or shebang.
 - **rule engine** — one module per rule:
@@ -207,6 +214,7 @@ discovery  →  parsers  →  rule engine  →  reporters
 | SW014 | persistence | high | Writes to `~/.bashrc`, `~/.zshrc`, crontab, launchd, `~/.claude/settings*`, other `CLAUDE.md` files |
 | SW015 | dangerous-script | high | In skill scripts: `eval` of downloaded code, `rm -rf ~`, running downloaded files |
 | SW016 | secret-in-config | high | Provider tokens and webhook URLs with tokens in agent configs; secret-looking values for secret-named keys |
+| SW017 | hook-script | high | A hook runs a script that can't be reviewed: obfuscated, packed, binary, huge or minified |
 
 **Rule principles**
 - Phrase rules (SW002, SW008, SW009, SW010) are heuristics with English and Russian vocabularies, extensible.
@@ -318,6 +326,10 @@ a prose mention without a command → medium; official installers of well-known 
   Corpus: 82 high / 97 medium across 2,917 repositories — live Slack webhooks, Anthropic/Perplexity keys in `.mcp.json`,
   `ANTHROPIC_AUTH_TOKEN` in `settings.local.json`. The snippet shows only the first 4 characters and the length. Private keys and JWTs stay in SW003.
   Test fixtures use generic forms only; provider-format tokens are generated at test run time, never committed.
+- SW017: for every hook target (section 5). Obfuscation signals (javascript-obfuscator `_0x…` identifiers, packers
+  such as `eval(function(p,a,c,k,e,…`, dense `\xNN` escapes, a long string array) or a binary → `high`/`high`; over
+  1 MB or a line over 20,000 characters (minified/bundled) → `medium`/`medium`. A readable script gets no SW017 finding —
+  its content is checked by the other rules. The finding is on the script, line 1, and names the hook event.
 - Known limitation of phrase rules: a phrase matches within one logical line.
 - `~/.claude.json` (`--global`): every line outside `mcpServers` (top-level and per project) is blanked, keeping line
   numbers; the JSON value is reduced to those sections and findings are limited to them. History is never scanned.
@@ -476,6 +488,9 @@ paste-site command) are still redistributed in GitHub mirrors months after the r
 
 **Known gaps, to fix before publishing numbers:**
 - A cap of 1,500 files per repository truncated 193 large collections (~1.8M files not fetched).
+- The fetch selects agent files only, so scripts that hooks run (`.claude/hooks/*`, plugin `hooks/*`, `.github/*.js`) are
+  missing: hook targets and SW017 can't be measured on this corpus. The rerun must add hook directories and the files
+  hook commands name.
 - Antivirus on the scanning machine removed the most malicious files on checkout, so the scan never saw them. Run the
   corpus on a machine without real-time antivirus interference (a VM), and report antivirus detections separately.
 
@@ -499,5 +514,5 @@ paste-site command) are still redistributed in GitHub mirrors months after the r
 - [ ] **Responsible disclosure** of corpus findings; publish the report and launch.
 - [ ] **Corpus rerun** without the gaps above.
 - [x] **SW016 secret-in-config.**
-- [ ] **Hook targets:** check the script a hook runs (size, minification, obfuscation).
+- [x] **Hook targets** scanned and locked with their hook file; **SW017 hook-script**.
 - [ ] **v0.2 sandbox:** container, proxy, honeytokens, agent run, tool-call logging, verdicts, report.

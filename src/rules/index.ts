@@ -15,6 +15,7 @@ import SW013 from "./SW013-hook-command.js";
 import SW014 from "./SW014-persistence.js";
 import SW015 from "./SW015-dangerous-script.js";
 import SW016 from "./SW016-secret-in-config.js";
+import SW017 from "./SW017-hook-script.js";
 
 /** All built-in rules, in ID order. Rules are registered explicitly — nothing is loaded dynamically. */
 export const ALL_RULES: Rule[] = [
@@ -34,6 +35,7 @@ export const ALL_RULES: Rule[] = [
   SW014,
   SW015,
   SW016,
+  SW017,
 ];
 
 export function findRule(id: string): Rule | undefined {

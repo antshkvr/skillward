@@ -1,3 +1,4 @@
+import { spawnSync } from "node:child_process";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 import { expect, it } from "vitest";
@@ -11,11 +12,11 @@ const RAW_INVISIBLE =
 
 const ROOT = join(import.meta.dirname, "..");
 
-function sources(dir: string): string[] {
+function sources(dir: string, all = false): string[] {
   return readdirSync(dir).flatMap((name) => {
     const p = join(dir, name);
-    if (name === "fixtures" || name === "node_modules") return [];
-    return statSync(p).isDirectory() ? sources(p) : /\.(ts|js|mjs|json|md)$/.test(name) ? [p] : [];
+    if ((!all && name === "fixtures") || name === "node_modules") return [];
+    return statSync(p).isDirectory() ? sources(p, all) : all || /\.(ts|js|mjs|json|md)$/.test(name) ? [p] : [];
   });
 }
 
@@ -51,4 +52,13 @@ it("keeps antivirus-sensitive command vocabulary out of shipped code (it lives i
         .flatMap((line, i) => (SENSITIVE.test(line) ? [`${relative(ROOT, file)}:${i + 1}`] : [])),
     );
   expect(offenders).toEqual([]);
+});
+
+it("doesn't let git ignore any fixture (a fixture missing from a commit only fails in CI)", () => {
+  // Personal global ignores often cover `.claude/settings.local.json` or `.env`; such fixtures need `git add -f`.
+  const files = sources(join(ROOT, "test", "fixtures"), true).map((f) => relative(ROOT, f).split("\\").join("/"));
+  const r = spawnSync("git", ["check-ignore", "--stdin"], { cwd: ROOT, input: files.join("\n"), encoding: "utf8" });
+  if (r.error) return; // git not available
+  const ignored = r.stdout.split("\n").filter(Boolean);
+  expect(ignored, "ignored fixtures — add them with `git add -f`").toEqual([]);
 });
