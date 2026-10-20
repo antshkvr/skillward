@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "docs": {
+      "type": "http",
+      "url": "https://mcp.example.invalid/mcp",
+      "headers": {
+        "Authorization": "Bearer FAKE_KEY_abc123"
+      }
+    }
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "mcpServers": {
+    "docs": { "type": "http", "url": "https://mcp.example.invalid/mcp" },
+    "local": { "command": "node", "args": ["server.js", "--port", "8787", "--host", "127.0.0.1"] }
+  }
+}

@@ -1,0 +1,119 @@
+name: skillward
+description: Scan AI agent instruction files (SKILL.md, CLAUDE.md, AGENTS.md, MCP configs, Claude Code hooks) and report to GitHub code scanning.
+author: skillward contributors
+branding:
+  icon: shield
+  color: purple
+
+inputs:
+  path:
+    description: Directory to scan, relative to the workspace.
+    default: "."
+  version:
+    description: Exact skillward version from npm (e.g. 0.1.1), or "local" to build from the action's own checkout.
+    default: "0.1.1"
+  fail-on:
+    description: Lowest severity that fails the job (info, low, medium, high), or "never" to only report.
+    default: high
+  only-changed:
+    description: Only report findings in files changed by the pull request — "auto" (on pull_request events), "true" or "false".
+    default: auto
+  config:
+    description: "Path to a skillward config file (default: skillward.config.json in the scanned directory)."
+    default: ""
+  upload-sarif:
+    description: "Upload results to GitHub code scanning (needs `security-events: write`)."
+    default: "true"
+  sarif-file:
+    description: Where to write the SARIF report.
+    default: skillward.sarif
+  category:
+    description: Code scanning category, to keep several skillward runs apart.
+    default: skillward
+  node-version:
+    description: Node.js version to run skillward with (22.12 or newer).
+    default: "22"
+
+outputs:
+  sarif-file:
+    description: Path of the SARIF report (empty if the scan did not run).
+    value: ${{ steps.scan.outputs.sarif-file }}
+  exit-code:
+    description: skillward exit code (0 clean, 1 findings at or above fail-on, 2 error).
+    value: ${{ steps.scan.outputs.exit-code }}
+  findings:
+    description: Number of active (not suppressed) findings.
+    value: ${{ steps.scan.outputs.findings }}
+
+runs:
+  using: composite
+  steps:
+    - name: Set up Node.js
+      uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+      with:
+        node-version: ${{ inputs.node-version }}
+
+    - name: Build skillward from the action checkout
+      if: inputs.version == 'local'
+      shell: bash
+      working-directory: ${{ github.action_path }}
+      run: npm ci --no-audit --no-fund && npm run build
+
+    - name: Find changed files
+      id: changed
+      shell: bash
+      env:
+        ONLY_CHANGED: ${{ inputs.only-changed }}
+        EVENT_NAME: ${{ github.event_name }}
+        BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        ACTION_PATH: ${{ github.action_path }}
+      run: |
+        mode="$ONLY_CHANGED"
+        if [ "$mode" = auto ]; then
+          if [ "$EVENT_NAME" = pull_request ]; then mode=true; else mode=false; fi
+        fi
+        case "$mode" in true | false) ;; *) echo "::error::skillward: 'only-changed' must be auto, true or false"; exit 2 ;; esac
+        if [ "$mode" = true ]; then
+          if [ -z "$BASE_SHA" ]; then
+            echo "::warning::skillward: no pull request base commit; scanning everything"
+          else
+            list="$RUNNER_TEMP/skillward-changed-files.txt"
+            if bash "$ACTION_PATH/action/changed-files.sh" "$BASE_SHA" > "$list"; then
+              echo "files-from=$list" >> "$GITHUB_OUTPUT"
+              echo "skillward: $(wc -l < "$list" | tr -d ' ') changed file(s)"
+            else
+              echo "::warning::skillward: could not list changed files; scanning everything"
+            fi
+          fi
+        fi
+
+    - name: Scan
+      id: scan
+      shell: bash
+      env:
+        INPUT_PATH: ${{ inputs.path }}
+        INPUT_VERSION: ${{ inputs.version }}
+        INPUT_FAIL_ON: ${{ inputs.fail-on }}
+        INPUT_CONFIG: ${{ inputs.config }}
+        SARIF_FILE: ${{ inputs.sarif-file }}
+        FILES_FROM: ${{ steps.changed.outputs.files-from }}
+        ACTION_PATH: ${{ github.action_path }}
+      run: bash "$ACTION_PATH/action/scan.sh"
+
+    - name: Upload SARIF to code scanning
+      if: always() && inputs.upload-sarif == 'true' && steps.scan.outputs.sarif-file != ''
+      uses: github/codeql-action/upload-sarif@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
+      with:
+        sarif_file: ${{ steps.scan.outputs.sarif-file }}
+        category: ${{ inputs.category }}
+
+    - name: Fail on findings
+      shell: bash
+      env:
+        EXIT_CODE: ${{ steps.scan.outputs.exit-code }}
+        FAIL_ON: ${{ inputs.fail-on }}
+      run: |
+        if [ "$FAIL_ON" != never ] && [ "${EXIT_CODE:-0}" != 0 ]; then
+          echo "::error::skillward found issues at or above '$FAIL_ON' — see the code scanning alerts or the job summary"
+          exit 1
+        fi

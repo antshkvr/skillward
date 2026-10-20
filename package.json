@@ -1,0 +1,66 @@
+{
+  "name": "skillward",
+  "version": "0.1.1",
+  "description": "Static scanner for AI agent instruction files: SKILL.md, CLAUDE.md, AGENTS.md, MCP configs, Claude Code settings and hooks.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/antshkvr/skillward.git"
+  },
+  "homepage": "https://github.com/antshkvr/skillward#readme",
+  "bugs": {
+    "url": "https://github.com/antshkvr/skillward/issues"
+  },
+  "type": "module",
+  "bin": {
+    "skillward": "dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "keywords": [
+    "ai",
+    "agents",
+    "claude-code",
+    "skills",
+    "mcp",
+    "security",
+    "scanner",
+    "prompt-injection"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json && node scripts/copy-assets.mjs",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "eslint . && tsc --noEmit",
+    "fix:invisible": "node scripts/escape-invisible.mjs src test scripts",
+    "dev": "tsx src/cli.ts",
+    "prepublishOnly": "npm run lint && npm test && npm run build",
+    "corpus:discover": "tsx scripts/corpus/discover.ts",
+    "corpus:fetch": "tsx scripts/corpus/fetch.ts",
+    "corpus:scan": "tsx scripts/corpus/scan.ts",
+    "corpus:recheck": "tsx scripts/corpus/recheck.ts"
+  },
+  "dependencies": {
+    "commander": "^15.0.0",
+    "diff": "^9.0.0",
+    "ignore": "^7.0.12",
+    "picocolors": "^1.1.1",
+    "yaml": "^2.9.1"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^22.20.5",
+    "eslint": "^10.13.0",
+    "tsx": "^4.23.15",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.71.2",
+    "vitest": "^5.0.5"
+  }
+}

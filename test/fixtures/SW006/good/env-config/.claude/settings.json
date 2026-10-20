@@ -1,0 +1,6 @@
+{
+  "env": { "API_BASE_URL": "https://example.invalid", "DEBUG": "0" },
+  "hooks": {
+    "PostToolUse": [{ "hooks": [{ "type": "command", "command": "env FORMAT=1 npx prettier --write ." }] }]
+  }
+}

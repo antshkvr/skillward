@@ -1,0 +1,29 @@
+{
+  "maxRepos": 3000,
+  "seeds": [
+    "anthropics/skills",
+    "anthropics/claude-code",
+    "anthropics/claude-plugins-official",
+    "obra/superpowers",
+    "ComposioHQ/awesome-claude-skills",
+    "VoltAgent/awesome-claude-code-subagents",
+    "wshobson/agents",
+    "wshobson/commands",
+    "davila7/claude-code-templates"
+  ],
+  "lists": [
+    "travisvn/awesome-claude-skills",
+    "ComposioHQ/awesome-claude-skills",
+    "hesreallyhim/awesome-claude-code",
+    "VoltAgent/awesome-claude-code-subagents"
+  ],
+  "searches": [
+    { "q": "filename:SKILL.md", "sizes": ["<1000", "1000..2000", "2000..3000", "3000..4500", "4500..6500", "6500..10000", "10000..20000", ">20000"] },
+    { "q": "filename:.mcp.json", "sizes": ["<300", "300..1000", ">1000"] },
+    { "q": "filename:marketplace.json path:.claude-plugin", "sizes": ["<1500", ">1500"] },
+    { "q": "filename:hooks.json path:hooks", "sizes": [] },
+    { "q": "filename:settings.json path:.claude hooks", "sizes": ["<2000", ">2000"] },
+    { "q": "filename:CLAUDE.md", "sizes": ["<3000", ">3000"] },
+    { "q": "filename:AGENTS.md", "sizes": [] }
+  ]
+}

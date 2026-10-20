@@ -1,0 +1,6 @@
+{
+  "mcpServers": {
+    "warehouse": { "type": "http", "url": "" },
+    "local-tools": { "type": "http", "url": "${TOOLS_URL:-http://localhost:7000/mcp}" }
+  }
+}

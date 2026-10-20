@@ -1,0 +1,22 @@
+{
+  "mcpServers": {
+    "notes": {
+      "command": "npx",
+      "args": [
+        "--yes",
+        "example-notes-mcp@latest"
+      ]
+    },
+    "github": {
+      "command": "docker",
+      "args": [
+        "run",
+        "-i",
+        "--rm",
+        "-e",
+        "GITHUB_TOKEN",
+        "ghcr.io/example/github-mcp-server"
+      ]
+    }
+  }
+}

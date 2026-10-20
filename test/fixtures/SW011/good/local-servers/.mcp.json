@@ -1,0 +1,30 @@
+{
+  "mcpServers": {
+    "local": {
+      "command": "node",
+      "args": [
+        "./dist/server.js"
+      ]
+    },
+    "py": {
+      "command": "python",
+      "args": [
+        "-m",
+        "my_mcp_server"
+      ]
+    },
+    "workspace": {
+      "command": "npx",
+      "args": [
+        "./packages/mcp-server"
+      ]
+    },
+    "uvrun": {
+      "command": "uv",
+      "args": [
+        "run",
+        "server.py"
+      ]
+    }
+  }
+}

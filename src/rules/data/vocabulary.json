@@ -1,0 +1,29 @@
+{
+  "$comment": "Command vocabulary that rules match, kept as data rather than JavaScript literals: ML-based antivirus engines flag scripts that contain PowerShell download-and-execute vocabulary, even inside detection regexes (see SPEC, section 3). Values are regex fragments.",
+  "psFetch": [
+    "iwr",
+    "irm",
+    "Invoke-WebRequest",
+    "Invoke-RestMethod"
+  ],
+  "psEval": [
+    "iex",
+    "Invoke-Expression"
+  ],
+  "psHttpClient": [
+    "New-Object\\s+(?:System\\.)?Net\\.WebClient",
+    "\\[System\\.Net\\.WebClient\\]"
+  ],
+  "psClientRead": [
+    "\\.DownloadString"
+  ],
+  "psDecode": [
+    "FromBase64String"
+  ],
+  "psSocket": [
+    "Net\\.Sockets\\.TCPClient"
+  ],
+  "psBits": [
+    "Start-BitsTransfer"
+  ]
+}

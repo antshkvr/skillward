@@ -1,0 +1,9 @@
+{
+  "name": "example-plugin",
+  "mcpServers": {
+    "crm": {
+      "type": "http",
+      "url": "https://crm.example.invalid/mcp?api_key=FAKE_KEY_xyz789"
+    }
+  }
+}

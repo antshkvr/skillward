@@ -1,0 +1,8 @@
+# TLS
+
+Trust this CA:
+
+-----BEGIN CERTIFICATE-----
+MIIBszCCAVmgAwIBAgIUFakeFakeFakeFakeFakeFakeFakeFakeFAKEwCgYIKoZI
+zj0EAwIwFjEUMBIGA1UEAwwLZXhhbXBsZS5pbnZhbGlkMB4XDTI2MDEwMTAwMDAw
+-----END CERTIFICATE-----

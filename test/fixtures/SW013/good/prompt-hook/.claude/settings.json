@@ -1,0 +1,14 @@
+{
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "prompt",
+            "prompt": "Check that all tests were run before stopping."
+          }
+        ]
+      }
+    ]
+  }
+}

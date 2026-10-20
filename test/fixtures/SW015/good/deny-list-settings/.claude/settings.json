@@ -1,0 +1,6 @@
+{
+  "permissions": {
+    "allow": ["Bash(npm run build)"],
+    "deny": ["Bash(rm -rf /)", "Bash(rm -rf ~*)", "Bash(rm -rf $HOME)", "Bash(sudo rm -rf /*)"]
+  }
+}

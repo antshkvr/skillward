@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "dev": {
+      "type": "http",
+      "url": "http://localhost:3000/mcp"
+    },
+    "dev6": {
+      "type": "sse",
+      "url": "http://127.0.0.1:8931/sse"
+    }
+  }
+}
