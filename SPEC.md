@@ -76,6 +76,9 @@ skillward scan [path]          # current directory by default
   --fail-on info|low|medium|high   # exit-code threshold, high by default
   --config <file>
 
+skillward explain [path]       # what each target lets the agent do (capability summary)
+  --global  --all  --format text|json  --output <file>  --config <file>
+
 skillward lock [path]          # create/update skillward.lock
 skillward verify [path]        # compare with the lockfile, show a diff
 skillward rules                # list rules with descriptions
@@ -87,6 +90,17 @@ skillward sandbox <skill-path> # v0.2, see section 7
 Also (v0.1): `scan`/`verify` accept `--no-inline-ignore` and `--no-color`; `lock` accepts `--config` and
 `--no-snapshots`; `verify` supports `--format text|json`; `scan --files-from <file>` reports findings only in the
 listed files (used by the Action on pull requests).
+
+**`explain` (v0.1).** The permissions-screen view of a scan (section 1): the same findings (suppressed ones left out),
+grouped per target into capabilities — runs code from the internet (SW004, SW010, SW015 remote-eval/download/LOLBins),
+gives a remote host control (reverse shells), turns approvals off (SW008), reads credentials or secrets (SW005, SW006,
+embedded keys/tokens in SW003), sends data out or contacts unusual hosts (SW007, SW012, SW005/SW006 with egress, high
+SW013 hooks), persists after the session (SW014), can destroy data (SW015 destructive), hides things from you (SW001,
+SW002, SW009, encoded content in SW003/SW015), runs automatically (SW013, SW011). Each capability shows its worst
+severity and up to three distinct places (relative to the target). Targets are sorted worst first; targets with
+nothing notable are counted, and listed with `--all`. It is informational: exit `0` once printed, `2` on errors — CI
+gates on `scan --fail-on`. JSON (`--format json`) has its own format version (`1`): `{ version, tool, root, targets:
+[{ kind, path, files, scripts, worst, capabilities: [{ id, label, severity, findings, places, locations }] }] }`.
 
 **SARIF (v0.1):** SARIF 2.1.0 for GitHub code scanning. Paths are relative to the current directory (the repository
 root in CI) via `uriBaseId: %SRCROOT%`; files outside it (e.g. `~/.claude`) use absolute `file://` URIs. Levels:
@@ -467,6 +481,7 @@ paste-site command) are still redistributed in GitHub mirrors months after the r
 - [x] **GitHub Action** with pull-request mode (`scan --files-from`).
 - [x] **Precision pass** over all rules against the public corpus; hand-labelled precision estimate.
 - [x] **Release workflow** with npm trusted publishing.
+- [x] **`explain`:** capability summary per target (the permissions-screen view).
 - [ ] **First npm release** (0.1.1).
 - [ ] **Responsible disclosure** of corpus findings; publish the report and launch.
 - [ ] **Corpus rerun** without the gaps above.

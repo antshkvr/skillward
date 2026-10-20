@@ -4,10 +4,12 @@ import { readFile, stat, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { Command, CommanderError, Option } from "commander";
+import { explain } from "./capabilities/index.js";
 import { ConfigError, loadConfig, type Config } from "./config/index.js";
 import { DiscoveryError } from "./discovery/index.js";
 import { exitCodeFor, scan } from "./engine/index.js";
 import { lock, LOCK_FILE_NAME, LockError, verify } from "./lock/index.js";
+import { explainJson, explainText } from "./reporters/explain.js";
 import { REPORTERS, type ReportFormat } from "./reporters/index.js";
 import { verifyJson, verifyText } from "./reporters/verify.js";
 import { ALL_RULES } from "./rules/index.js";
@@ -47,6 +49,12 @@ interface CommonFlags {
   inlineIgnore?: boolean;
 }
 
+interface ExplainFlags extends Omit<CommonFlags, "format" | "failOn"> {
+  format: "text" | "json";
+  global?: boolean;
+  all?: boolean;
+}
+
 interface ScanFlags extends CommonFlags {
   global?: boolean;
   filesFrom?: string;
@@ -83,6 +91,21 @@ export async function run(argv: string[], io: CliIO = defaultIO): Promise<number
   ).action(async (path: string, flags: ScanFlags) => {
     exitCode = await guard(io, () => runScan(path, flags, io));
   });
+
+  program
+    .command("explain")
+    .description("summarize what each skill, MCP server and config lets the agent do (the permissions-screen view of scan)")
+    .argument("[path]", "file or directory to explain", ".")
+    .addOption(new Option("--format <format>", "output format").choices(["text", "json"]).default("text"))
+    .option("--output <file>", "write the report to a file instead of stdout")
+    .option("--global", "also explain ~/.claude and the MCP servers in ~/.claude.json")
+    .option("--all", "also list targets with nothing notable")
+    .option("--config <file>", `config file (default: skillward.config.json in the scan root)`)
+    .option("--no-inline-ignore", "ignore skillward-ignore comments (use when auditing third-party skills)")
+    .option("--no-color", "disable colors")
+    .action(async (path: string, flags: ExplainFlags) => {
+      exitCode = await guard(io, () => runExplain(path, flags, io));
+    });
 
   program
     .command("lock")
@@ -167,6 +190,21 @@ async function runScan(path: string, flags: ScanFlags, io: CliIO): Promise<numbe
   await emit(report, flags, io);
   if (result.errors.length > 0) return EXIT_ERROR;
   return exitCodeFor(result.findings, failOn);
+}
+
+/** Informational: exit 0 once the summary is printed (CI gates on `scan --fail-on`), 2 on run errors. */
+async function runExplain(path: string, flags: ExplainFlags, io: CliIO): Promise<number> {
+  const root = resolve(path);
+  const loaded = await loadConfig({ configPath: flags.config, root: (await isDirectory(root)) ? root : undefined });
+  const config = withFlags(loaded.config, flags);
+  const result = await scan({ path, global: flags.global, homeDir: io.homeDir, config });
+  const targets = explain(result);
+  const report =
+    flags.format === "json"
+      ? explainJson(result.root, targets)
+      : explainText(result.root, targets, { color: useColor({ ...flags, format: "text" }, io), all: Boolean(flags.all) });
+  await emit(report, flags, io);
+  return result.errors.length > 0 ? EXIT_ERROR : EXIT_OK;
 }
 
 async function runVerify(path: string, flags: CommonFlags, io: CliIO): Promise<number> {

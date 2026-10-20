@@ -12,6 +12,7 @@ First public release.
 - No quadratic work on minified one-line files.
 
 **Output**
+- `explain`: what each skill, MCP server and config lets the agent do — runs code from the internet, turns approvals off, reads secrets, sends data out, persists, hides things, runs automatically… — with the worst severity and where it shows.
 - `text`, `json` (format version 1), `sarif` (2.1.0, GitHub code scanning).
 - Everything quoted from scanned files is escaped; snippets are truncated and secrets never printed in full.
 

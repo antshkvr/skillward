@@ -32,6 +32,8 @@ npx skillward scan --global        # also ~/.claude and the MCP servers in ~/.cl
 npx skillward scan --format sarif --output skillward.sarif
 npx skillward scan --fail-on medium
 
+npx skillward explain              # what each skill / MCP server / config lets the agent do
+
 npx skillward lock                 # pin current agent files in skillward.lock
 npx skillward verify               # diff against skillward.lock and scan what changed
 npx skillward rules                # list rules
@@ -49,6 +51,26 @@ npx skillward rules                # list rules
 | `--no-inline-ignore` | | Ignore `skillward-ignore` comments — use when auditing third-party skills |
 | `--files-from <file>` | | Only report findings in the listed files (one path per line, relative to the current directory; `#` comments allowed) — e.g. the output of `git diff --name-only` |
 | `--no-color` | | Disable colors (also `NO_COLOR`) |
+
+### `explain [path]`
+
+The permissions-screen view: the same findings as `scan`, grouped per target into what it lets the agent do.
+
+```
+.claude/skills/setup  skill · 3 files · 1 script
+  HIGH    runs code from the internet               SKILL.md:12 · scripts/install.sh:3
+  MEDIUM  turns approvals off                       SKILL.md:30
+  LOW     runs automatically                        hooks/hooks.json:9
+  not seen: remote control, secrets, network, persistence, destructive, concealment
+
+14 more target(s) with nothing notable (--all lists them).
+
+15 target(s) — runs code from the internet: 1 · turns approvals off: 1 · runs automatically: 1
+```
+
+Capabilities: runs code from the internet · gives a remote host control · turns approvals off · reads credentials or secrets · sends data out or contacts unusual hosts · persists after the session · can destroy data · hides things from you · runs automatically. Each shows its worst severity and where it appears.
+
+`explain` is informational: it exits `0` once the summary is printed (`2` on errors) — gate CI with `scan --fail-on`. Options: `--global`, `--all` (also list targets with nothing notable), `--format text|json` (JSON format version 1), `--output`, `--config`, `--no-inline-ignore`, `--no-color`.
 
 **Exit codes:** `0` — clean or below threshold; `1` — findings at or above `--fail-on`; `2` — run error (bad path, bad config, a rule crashed).
 
