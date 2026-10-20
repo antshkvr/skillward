@@ -91,7 +91,7 @@ export function parseText(source: SourceFile, text: string): ParsedFile {
   const ext = extname(name).toLowerCase();
   const file: ParsedFile = { ...source, type: "text", text, lineStarts };
 
-  if (ext === ".md" || ext === ".mdx" || ext === ".markdown") {
+  if (ext === ".md" || ext === ".mdx" || ext === ".markdown" || ext === ".mdc") {
     file.type = "markdown";
     file.markdown = parseMarkdown(text, lineStarts);
   } else if (name === CLAUDE_JSON) {

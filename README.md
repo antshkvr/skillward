@@ -1,6 +1,6 @@
 # skillward
 
-Static scanner for AI agent instruction files — `SKILL.md` skills, `CLAUDE.md`, `AGENTS.md`, MCP configs, Claude Code settings and hooks.
+Static scanner for AI agent instruction files — `SKILL.md` skills, `CLAUDE.md`, `AGENTS.md`, MCP configs, Claude Code settings and hooks, plus Cursor, GitHub Copilot, Gemini CLI, Windsurf, Cline and Kiro rules.
 
 **skillward shows what you agree to when you give an agent a skill, an MCP server or someone else's repository — and makes sure it doesn't change behind your back.**
 
@@ -106,6 +106,18 @@ Capabilities: runs code from the internet · gives a remote host control · turn
 | `mcp-config` | `.mcp.json`; with `--global`, the `mcpServers` sections of `~/.claude.json` |
 | `settings` | `.claude/settings.json`, `.claude/settings.local.json`, plugin `hooks/hooks.json` |
 | `plugin-manifest` | `.claude-plugin/plugin.json`, `.claude-plugin/marketplace.json` |
+
+Other agents, with the same rules:
+
+| Agent | Files |
+|---|---|
+| Cursor | `.cursorrules`, `.cursor/rules/**/*.mdc`, `.cursor/commands/*.md`, `.cursor/mcp.json`, `.cursor/hooks.json` (and the scripts its hooks run) |
+| GitHub Copilot / VS Code | `.github/copilot-instructions.md`, `.github/instructions/*.instructions.md`, `.github/prompts/*.prompt.md`, `.github/chatmodes/*.chatmode.md`, `.github/agents/*.agent.md`, `.vscode/mcp.json` |
+| Gemini CLI | `GEMINI.md`, `.gemini/settings.json` (MCP servers), `.gemini/commands/**/*.toml` |
+| Windsurf | `.windsurfrules`, `.windsurf/rules/*.md`, `.windsurf/workflows/*.md` |
+| Cline | `.clinerules` (file or folder) |
+| Kiro | `.kiro/steering/*.md`, `.kiro/settings/mcp.json` |
+| Codex, others | `AGENTS.md`; skills in any folder with a `SKILL.md` (`.agents/skills`, `.codex/skills`, `.cursor/skills`, …) |
 
 Scripts that hooks run (`node .github/setup.js`, `"$CLAUDE_PROJECT_DIR"/.claude/hooks/check.sh`, `${CLAUDE_PLUGIN_ROOT}/hooks/run.sh`) are added to the hook file's target when they live inside the scanned folder: their content is scanned, `lock` pins them, and SW017 flags the ones that can't be reviewed.
 

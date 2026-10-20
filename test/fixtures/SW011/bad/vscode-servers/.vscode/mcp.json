@@ -1,0 +1,6 @@
+{
+  "inputs": [],
+  "servers": {
+    "tracker": { "type": "stdio", "command": "npx", "args": ["-y", "@example/tracker-mcp"] }
+  }
+}

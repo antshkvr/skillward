@@ -45,7 +45,8 @@ export async function hookTargets(file: string, scanRoot: string, home?: string)
 function baseDirFor(file: string): string {
   const dir = dirname(file);
   const name = dir.split(sep).pop();
-  return name === ".claude" || name === "hooks" || name === ".claude-plugin" ? dirname(dir) : dir;
+  // Cursor runs project hooks from the project root too (`.cursor/hooks/x.sh` paths).
+  return name === ".claude" || name === "hooks" || name === ".claude-plugin" || name === ".cursor" ? dirname(dir) : dir;
 }
 
 function commandsOf(value: unknown): Array<{ event: string; command: string }> {
@@ -57,6 +58,9 @@ function commandsOf(value: unknown): Array<{ event: string; command: string }> {
     for (const [event, groups] of Object.entries(hooks as Record<string, unknown>)) {
       if (!Array.isArray(groups)) continue;
       for (const group of groups) {
+        // Cursor: `{event: [{command}]}`; Claude Code: `{event: [{matcher, hooks: [{command}]}]}`.
+        const direct = (group as { command?: unknown })?.command;
+        if (typeof direct === "string") out.push({ event, command: direct });
         const list = (group as { hooks?: unknown })?.hooks;
         if (!Array.isArray(list)) continue;
         for (const hook of list) {

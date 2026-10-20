@@ -32,8 +32,9 @@ const ALWAYS_SKIPPED_DIRS = new Set(["node_modules", ".git", ".hg", ".svn", ".sk
  * Agent configuration that is often gitignored on purpose (local settings and memory) but is still
  * loaded by the agent, so `.gitignore` does not hide it from the scan. Config `ignore` still applies.
  */
-const AGENT_DIRS = new Set([".claude", ".claude-plugin"]);
-const INSTRUCTION_FILES = new Set(["CLAUDE.md", "CLAUDE.local.md", "AGENTS.md"]);
+const AGENT_DIRS = new Set([".claude", ".claude-plugin", ".cursor", ".windsurf", ".gemini", ".kiro", ".clinerules"]);
+/** Instruction files recognized by name at any depth (Claude Code, AGENTS.md, Gemini CLI, Cursor, Windsurf, Cline). */
+const INSTRUCTION_FILES = new Set(["CLAUDE.md", "CLAUDE.local.md", "AGENTS.md", "GEMINI.md", ".cursorrules", ".windsurfrules", ".clinerules"]);
 const GITIGNORE_EXEMPT_FILES = new Set([...INSTRUCTION_FILES, ".mcp.json"]);
 
 /** What `--global` looks at inside `~/.claude`; the rest (transcripts, caches, todos) is not agent config. */
@@ -101,7 +102,7 @@ export async function discover(options: DiscoveryOptions): Promise<DiscoveryResu
   return { root, targets, skipped };
 }
 
-const HOOK_FILE = /(?:^|\/)(?:\.claude\/settings(?:\.local)?\.json|hooks\/hooks\.json|\.claude-plugin\/plugin\.json)$/;
+const HOOK_FILE = /(?:^|\/)(?:\.claude\/settings(?:\.local)?\.json|hooks\/hooks\.json|\.claude-plugin\/plugin\.json|\.cursor\/hooks\.json)$/;
 
 /**
  * Adds the local scripts that hooks run to the hook file's target (see SPEC, "Hook targets"), so their content is
@@ -261,11 +262,29 @@ function parentDisplay(path: string): string {
   return idx === -1 ? "." : path.slice(0, idx);
 }
 
+/** Instruction files of other agents, by path (see SPEC section 5, "Other agents"). */
+const OTHER_AGENT_INSTRUCTIONS = [
+  /\/\.cursor\/rules\/.+\.(?:mdc|md)$/,
+  /\/\.cursor\/commands\/.+\.md$/,
+  /\/\.github\/copilot-instructions\.md$/,
+  /\/\.github\/instructions\/.+\.instructions\.md$/,
+  /\/\.github\/prompts\/.+\.prompt\.md$/,
+  /\/\.github\/chatmodes\/.+\.chatmode\.md$/,
+  /\/\.github\/agents\/.+\.agent\.md$/,
+  /\/\.windsurf\/(?:rules|workflows)\/.+\.md$/,
+  /\/\.clinerules\/.+\.md$/,
+  /\/\.kiro\/steering\/.+\.md$/,
+  /\/\.gemini\/commands\/.+\.toml$/,
+];
+
 /** Target kind of a standalone file, by its absolute forward-slash path. */
 export function classifyFile(path: string, pluginRoots: string[]): TargetKind | undefined {
   const name = path.slice(path.lastIndexOf("/") + 1);
   if (INSTRUCTION_FILES.has(name)) return "instructions";
   if (/\/\.claude\/(commands|agents)\/.+\.md$/.test(path)) return "instructions";
+  if (OTHER_AGENT_INSTRUCTIONS.some((re) => re.test(path))) return "instructions";
+  if (/\/\.(?:cursor|vscode)\/mcp\.json$|\/\.gemini\/settings\.json$|\/\.kiro\/settings\/mcp\.json$/.test(path)) return "mcp-config";
+  if (/\/\.cursor\/hooks\.json$/.test(path)) return "settings";
   if (name === ".mcp.json" || name === ".claude.json") return "mcp-config";
   if (/\/\.claude\/settings(\.local)?\.json$/.test(path)) return "settings";
   if (/\/\.claude-plugin\/(plugin|marketplace)\.json$/.test(path)) return "plugin-manifest";

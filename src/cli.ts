@@ -66,7 +66,7 @@ export async function run(argv: string[], io: CliIO = defaultIO): Promise<number
 
   program
     .name("skillward")
-    .description("Scan AI agent instruction files (SKILL.md, CLAUDE.md, AGENTS.md, MCP configs, settings, hooks) for dangerous content.")
+    .description("Scan AI agent instruction files (SKILL.md, CLAUDE.md, AGENTS.md, MCP configs, settings, hooks, Cursor/Copilot/Gemini/Windsurf/Cline rules) for dangerous content.")
     .version(VERSION, "-v, --version")
     .exitOverride()
     .configureOutput({ writeOut: io.stdout, writeErr: io.stderr });

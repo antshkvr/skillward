@@ -124,6 +124,10 @@ export function selectAgentFiles(paths: string[], options: { maxFiles: number; p
     .filter((p) => p === ".claude-plugin/plugin.json" || p.endsWith("/.claude-plugin/plugin.json"))
     .map((p) => abs(p).slice(0, -"/.claude-plugin/plugin.json".length));
   const inSkill = (p: string) => skillDirs.some((d) => d === "" || p.startsWith(d + "/"));
+  // Scripts hooks run usually live next to the hook config; discovery attaches them (hook targets).
+  const pluginDirs = pluginRoots.map((r) => r.slice("/r/".length));
+  const inHookDir = (p: string) =>
+    /(?:^|\/)\.(?:claude|cursor)\/hooks\//.test(p) || pluginDirs.some((d) => p.startsWith(d === "" ? "hooks/" : `${d}/hooks/`));
 
   // Agent files proper (SKILL.md, instructions, configs) come first, so a huge skill does not crowd them out.
   const isAgentFile = (p: string) => p === "SKILL.md" || p.endsWith("/SKILL.md") || !!classifyFile(abs(p), pluginRoots);
@@ -133,7 +137,7 @@ export function selectAgentFiles(paths: string[], options: { maxFiles: number; p
   for (const p of paths) {
     const ext = p.includes(".") ? p.slice(p.lastIndexOf(".") + 1).toLowerCase() : "";
     if (BINARY_EXTENSIONS.has(ext)) continue;
-    if (!inSkill(p) && !isAgentFile(p)) continue;
+    if (!inSkill(p) && !isAgentFile(p) && !inHookDir(p)) continue;
     if (options.portable && !isPortablePath(p)) {
       unportable++;
       continue;

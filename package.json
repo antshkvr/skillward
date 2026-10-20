@@ -1,7 +1,7 @@
 {
   "name": "skillward",
   "version": "0.1.1",
-  "description": "Static scanner for AI agent instruction files: SKILL.md, CLAUDE.md, AGENTS.md, MCP configs, Claude Code settings and hooks.",
+  "description": "Shows what you agree to when you give an AI agent a skill, an MCP server or a repo: static scanner for SKILL.md, CLAUDE.md, AGENTS.md, MCP configs, hooks, and Cursor/Copilot/Gemini/Windsurf/Cline rules.",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -28,6 +28,12 @@
     "ai",
     "agents",
     "claude-code",
+    "cursor",
+    "github-copilot",
+    "gemini-cli",
+    "windsurf",
+    "cline",
+    "agent-skills",
     "skills",
     "mcp",
     "security",

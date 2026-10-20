@@ -28,6 +28,8 @@ export function mcpServers(file: ParsedFile): McpServer[] {
     }
   };
   collect(member(root, "mcpServers"));
+  // VS Code / GitHub Copilot `.vscode/mcp.json` keeps them under `servers`.
+  if (/(?:^|\/)\.vscode\/mcp\.json$/.test(file.path)) collect(member(root, "servers"));
   const projects = member(root, "projects");
   if (projects?.kind === "object") {
     for (const p of projects.entries) collect(member(p.value, "mcpServers"), p.key);
@@ -62,9 +64,10 @@ export function hookCommands(file: ParsedFile): HookCommand[] {
       if (groups.kind !== "array") continue;
       for (const group of groups.items) {
         const matcher = stringValue(member(group, "matcher"));
+        // Claude Code nests hooks in groups (`{matcher, hooks: [...]}`); Cursor lists them directly (`[{command}]`).
         const list = member(group, "hooks");
-        if (list?.kind !== "array") continue;
-        for (const hook of list.items) {
+        const items = list?.kind === "array" ? list.items : member(group, "command") ? [group] : [];
+        for (const hook of items) {
           for (const type of ["command", "url"] as const) {
             const node = member(hook, type);
             if (node?.kind === "string") {

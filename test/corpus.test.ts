@@ -90,6 +90,16 @@ describe("corpus: selectAgentFiles", () => {
     );
   });
 
+  it("also selects other agents' files and the scripts in hook folders", () => {
+    const sel = selectAgentFiles(
+      [".cursor/rules/a.mdc", ".github/copilot-instructions.md", ".claude/hooks/guard.sh", "plugins/p/hooks/run.sh", "src/app.ts"],
+      { maxFiles: 100 },
+    );
+    expect(sel.files.sort()).toEqual([".claude/hooks/guard.sh", ".cursor/rules/a.mdc", ".github/copilot-instructions.md"].sort());
+    const plugin = selectAgentFiles(["plugins/p/.claude-plugin/plugin.json", "plugins/p/hooks/run.sh", "plugins/p/src/x.ts"], { maxFiles: 100 });
+    expect(plugin.files.sort()).toEqual(["plugins/p/.claude-plugin/plugin.json", "plugins/p/hooks/run.sh"]);
+  });
+
   it("treats a root-level SKILL.md as a skill covering the whole repo, standalone files first", () => {
     const sel = selectAgentFiles(["a.py", "b.py", "SKILL.md", ".mcp.json"], { maxFiles: 2 });
     expect(sel.files.slice(0, 2)).toEqual(["SKILL.md", ".mcp.json"]);

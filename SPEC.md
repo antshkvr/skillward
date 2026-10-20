@@ -3,7 +3,8 @@
 ## 1. What it is
 
 A CLI that checks AI-agent instruction files for dangerous content and behavior: `SKILL.md` and skill files,
-`CLAUDE.md`, `AGENTS.md`, MCP server configs, Claude Code settings and hooks.
+`CLAUDE.md`, `AGENTS.md`, MCP server configs, Claude Code settings and hooks — and the equivalent files of Cursor, GitHub
+Copilot, Gemini CLI, Windsurf, Cline and Kiro.
 
 **Problem.** Skills and instruction files aren't documentation: they are commands an agent executes with the developer's
 permissions. Public registries already carry malicious skills, and classic scanners miss attacks written in plain text.
@@ -127,6 +128,18 @@ discovery  →  parsers  →  rule engine  →  reporters
     plugin root;
   - `plugin-manifest`: `.claude-plugin/plugin.json`, `marketplace.json`.
 
+  - **Other agents** (same kinds, same rules):
+    - `instructions`: `GEMINI.md`; Cursor `.cursorrules`, `.cursor/rules/**/*.{mdc,md}`, `.cursor/commands/**/*.md`;
+      GitHub Copilot `.github/copilot-instructions.md`, `.github/instructions/**/*.instructions.md`,
+      `.github/prompts/**/*.prompt.md`, `.github/chatmodes/**/*.chatmode.md`, `.github/agents/**/*.md`; Windsurf
+      `.windsurfrules`, `.windsurf/rules/**/*.md`, `.windsurf/workflows/**/*.md`; Cline `.clinerules` (a file, or
+      `.clinerules/**/*.md`); Kiro `.kiro/steering/**/*.md`; Gemini CLI custom commands `.gemini/commands/**/*.toml`.
+    - `mcp-config`: `.cursor/mcp.json`, `.vscode/mcp.json` (servers under `servers`), `.gemini/settings.json`,
+      `.kiro/settings/mcp.json`.
+    - `settings`: Cursor hooks `.cursor/hooks.json` (`{"version": 1, "hooks": {event: [{"command": …}]}}`; scripts run
+      from the project root).
+    - These folders and files are agent configuration, so `.gitignore` doesn't hide them either (`.cursor/`,
+      `.windsurf/`, `.gemini/`, `.kiro/`, `.clinerules/`, and the root files above).
   It honors `.gitignore` (including nested ones) and the config's `ignore`, and never enters `node_modules`, `.git`,
   `.hg`, `.svn`, `.skillward`.
   - **`.gitignore` exception:** the contents of `.claude/`, `.claude-plugin/` and the files `CLAUDE.md`,
@@ -515,4 +528,6 @@ paste-site command) are still redistributed in GitHub mirrors months after the r
 - [ ] **Corpus rerun** without the gaps above.
 - [x] **SW016 secret-in-config.**
 - [x] **Hook targets** scanned and locked with their hook file; **SW017 hook-script**.
+- [x] **Other agents:** Cursor, GitHub Copilot / VS Code, Gemini CLI, Windsurf, Cline, Kiro (project-level files).
+- [ ] **Other agents, global:** `~/.cursor`, `~/.gemini`, Windsurf/Cline user MCP configs in `--global`.
 - [ ] **v0.2 sandbox:** container, proxy, honeytokens, agent run, tool-call logging, verdicts, report.
