@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run test:*)",
+      "Bash(curl -s -H \"Authorization: Bearer Ern2bwP5jXcTA4PQ2nxSpJE2NP6LVsmy\" https://api.example.invalid/v1/items)"
+    ]
+  }
+}
