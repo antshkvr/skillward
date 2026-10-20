@@ -128,3 +128,13 @@ describe("cli", () => {
     expect(version.stdout.trim()).toMatch(/^\d+\.\d+\.\d+/);
   });
 });
+
+describe("cli: empty scan", () => {
+  it("says nothing was found to check instead of a green check", async () => {
+    const empty = mkdtempSync(join(tmpdir(), "skillward-empty-"));
+    const { code, stdout } = await cli(["scan", empty]);
+    expect(code).toBe(0);
+    expect(stdout).toContain("No agent configuration found under");
+    expect(stdout).not.toContain("✔");
+  });
+});

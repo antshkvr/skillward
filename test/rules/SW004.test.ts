@@ -158,3 +158,12 @@ describe("SW004 pipe-to-shell", () => {
     expect(checkText(rule, text)).toHaveLength(2);
   });
 });
+
+describe("SW004 performance", () => {
+  it("stays fast on long lines with many downloads (no backtracking blow-up)", () => {
+    const started = Date.now();
+    checkText(rule, "curl https://example.invalid/x.sh ".repeat(20_000) + "\n");
+    checkText(rule, "curl https://example.invalid/x.sh | grep a | ".repeat(10_000) + "\n");
+    expect(Date.now() - started).toBeLessThan(2000);
+  });
+});

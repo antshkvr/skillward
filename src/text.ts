@@ -76,23 +76,46 @@ export function logicalLines(text: string): LogicalLine[] {
     const piece = continued ? raw.slice(0, -1) : raw;
 
     if (!current) current = { text: "", offsets: [], line: lineNo };
-    for (let i = 0; i < piece.length; i++) {
-      current.text += piece[i];
-      current.offsets.push(pos + i);
-    }
+    current.text += piece;
+    for (let i = 0; i < piece.length; i++) current.offsets.push(pos + i);
     if (continued) {
       current.text += " ";
       current.offsets.push(pos + piece.length);
     } else {
-      result.push(current);
+      pushChunked(result, current);
       current = undefined;
     }
     if (end === text.length) break;
     pos = end + 1;
     lineNo++;
   }
-  if (current) result.push(current);
+  if (current) pushChunked(result, current);
   return result;
+}
+
+/**
+ * Lines longer than this are cut into pieces at word boundaries. Prose and commands are never this long; minified
+ * code and encoded data are, and per-match context checks on a 1 MB line made several rules quadratic or worse.
+ * A pattern that straddles a cut is missed — acceptable for such lines.
+ */
+export const MAX_LOGICAL_LINE = 4000;
+
+function pushChunked(result: LogicalLine[], line: LogicalLine): void {
+  if (line.text.length <= MAX_LOGICAL_LINE) {
+    result.push(line);
+    return;
+  }
+  let start = 0;
+  while (start < line.text.length) {
+    let end = Math.min(start + MAX_LOGICAL_LINE, line.text.length);
+    if (end < line.text.length) {
+      // Prefer to cut after whitespace within the last 10% of the window.
+      const cut = line.text.lastIndexOf(" ", end);
+      if (cut > end - MAX_LOGICAL_LINE / 10) end = cut + 1;
+    }
+    result.push({ text: line.text.slice(start, end), offsets: line.offsets.slice(start, end), line: line.line });
+    start = end;
+  }
 }
 
 const INVISIBLE =
@@ -122,6 +145,23 @@ export const SNIPPET_MAX = 120;
  * Builds a short, safe snippet around [start, end) of a line.
  * Long lines are cut around the match; invisible characters are escaped.
  */
+/**
+ * `makeSnippet` for a match at 0-based columns `[start, end)` of `line`, reading only a window around it — not the
+ * whole line, which made thousands of findings on one 1 MB line quadratic.
+ */
+export function snippetAt(text: string, lineStarts: number[], line: number, start: number, end: number): string {
+  const lineStart = lineStarts[line - 1] ?? 0;
+  const next = lineStarts[line];
+  let lineEnd = next === undefined ? text.length : next - 1;
+  if (text.charCodeAt(lineEnd - 1) === 13 /* \r */) lineEnd--;
+  const from = Math.max(lineStart, lineStart + start - SNIPPET_MAX);
+  const to = Math.min(lineEnd, lineStart + end + SNIPPET_MAX);
+  let snippet = makeSnippet(text.slice(from, to), lineStart + start - from, lineStart + end - from);
+  if (from > lineStart && !snippet.startsWith("…")) snippet = "…" + snippet;
+  if (to < lineEnd && !snippet.endsWith("…")) snippet += "…";
+  return snippet;
+}
+
 export function makeSnippet(line: string, start = 0, end = line.length, max = SNIPPET_MAX): string {
   let from = 0;
   let to = line.length;

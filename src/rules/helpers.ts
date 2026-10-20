@@ -1,5 +1,5 @@
 import type { Confidence, Finding, ParsedFile, Rule, Severity } from "../types.js";
-import { lineText, locate, makeSnippet } from "../text.js";
+import { locate, snippetAt } from "../text.js";
 
 export interface FindingInput {
   /** Offset of the match in `file.text`. */
@@ -14,7 +14,6 @@ export interface FindingInput {
 
 export function findingAt(rule: Rule, file: ParsedFile, input: FindingInput): Finding {
   const { line, column } = locate(file.lineStarts, input.offset);
-  const text = lineText(file.text, file.lineStarts, line);
   return {
     ruleId: rule.id,
     severity: input.severity ?? rule.severity,
@@ -22,7 +21,7 @@ export function findingAt(rule: Rule, file: ParsedFile, input: FindingInput): Fi
     line,
     column,
     message: input.message,
-    snippet: makeSnippet(text, column - 1, column - 1 + input.length),
+    snippet: snippetAt(file.text, file.lineStarts, line, column - 1, column - 1 + input.length),
     confidence: input.confidence,
   };
 }

@@ -27,8 +27,9 @@ It is a permissions screen, not an antivirus:
 Versus antivirus: antivirus looks for known malicious code by signatures and heuristics; skillward looks for dangerous
 **instructions and capabilities** (download and run, turn approvals off, read secrets, persist on the machine, hide
 actions), so it catches the shape of an attack whatever the payload. The two are neighboring layers: in the corpus
-(section 11), antivirus removed 4 of 164 files from the ClawHavoc campaign — the ones carrying the payload inline;
-skillward flagged all of them.
+(section 11, October 2026), Windows Defender quarantined 4 ClawHavoc files — the ones carrying the payload inline — and
+left 160 copies whose instructions only point at it; skillward flags both kinds. The SW010 checks for these shapes were
+written after studying the campaign, so this shows the layers differ, not that skillward generalizes.
 
 **Test for new features:** does it help decide "should I give the agent this?" or "has what I agreed to changed?"
 If yes, it belongs here (a rule for secrets in agent configs, checking the script a hook runs). Signature-based

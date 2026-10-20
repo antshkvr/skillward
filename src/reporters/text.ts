@@ -51,7 +51,15 @@ export const textReporter: Reporter = ({ result, failOn, color }) => {
 
   const files = result.targets.reduce((n, t) => n + t.files.length, 0);
   const scanned = `${result.targets.length} target(s), ${files} file(s) scanned`;
-  if (result.findings.length === 0) {
+  if (result.targets.length === 0) {
+    // Not a green check: nothing was checked. Usually the wrong folder, or a project without agent configuration.
+    out.push(
+      c.yellow(`No agent configuration found under ${escapeInvisible(result.root)}.`),
+      c.dim(
+        "Looked for skills (folders with SKILL.md), CLAUDE.md / AGENTS.md / GEMINI.md, .claude/, .mcp.json, plugins, and Cursor, Copilot, Windsurf, Cline and Kiro rules. Use --global to include ~/.claude.",
+      ),
+    );
+  } else if (result.findings.length === 0) {
     out.push(c.green(`✔ No findings. ${scanned}.`));
   } else {
     const counts = [...SEVERITIES]

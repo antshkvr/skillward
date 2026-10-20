@@ -143,7 +143,9 @@ const NOISE_OBJECT =
  * ("never tell the user something is done because one part exists") and is reported at medium.
  */
 const CONCEALED_OBJECT =
-  /^\s*(?:$|[.,;:!?)\]`*—–”»]|-\s|(?:about|of|anything|this|these|that\s+(?:you|we|the agent|this|these|it)|(?:what|which|how|where|when|why)\s+(?:you|we|the agent)|you\s+(?:ran|did|used|read|sent|installed|changed|deleted|uploaded|wrote|called|are|were|have|had))(?![\p{L}\p{N}_]))/iu;
+  // "about internal retries" (implementation noise) and "that it succeeded" (a claim) are advice on what not to say —
+  // medium; "about this", "about the errors", "that you ran …" hide what the agent does or what happened — high.
+  /^\s*(?:$|[.,;:!?)\]`*—–”»]|-\s|(?:(?:about|of)(?!\s+(?:the\s+)?(?:internal|internals|implementation|retries|retry|intermediate|debug|debugging|verbose|logs?|stack\s+traces?|caching|cache|tokens?\s+usage)\b)|anything|this|these|that\s+(?:you|we|the agent)|(?:what|which|how|where|when|why)\s+(?:you|we|the agent)|you\s+(?:ran|did|used|read|sent|installed|changed|deleted|uploaded|wrote|called|are|were|have|had))(?![\p{L}\p{N}_]))/iu;
 const rule: Rule = {
   id: "SW009",
   name: "concealment",

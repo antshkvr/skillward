@@ -182,10 +182,13 @@ function assess(cps: number[], hasRtl: boolean): { message: string; severity: Se
 
 /** The run sits between `[` and `]` on its line, as in a regex character class. */
 function insideCharacterClass(text: string, start: number, end: number): boolean {
-  const lineStart = text.lastIndexOf("\n", start - 1) + 1;
-  const lineEnd = text.indexOf("\n", end);
-  const before = text.slice(lineStart, start);
-  const after = text.slice(end, lineEnd === -1 ? text.length : lineEnd);
+  // A 200-character window on the same line, never a search over the whole text: many runs on one huge line made
+  // this quadratic.
+  const left = text.slice(Math.max(0, start - 200), start);
+  const right = text.slice(end, end + 200);
+  const before = left.slice(left.lastIndexOf("\n") + 1);
+  const nl = right.indexOf("\n");
+  const after = nl === -1 ? right : right.slice(0, nl);
   return before.lastIndexOf("[") > before.lastIndexOf("]") && after.includes("]");
 }
 

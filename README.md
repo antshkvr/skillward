@@ -11,7 +11,7 @@ Skills and instruction files aren't documentation: they are commands an agent ex
 - **Not just once:** `lock` / `verify` pin what you reviewed and fail when it changes, so a trusted skill can't quietly turn into something else on update.
 - **No malice required:** risky-but-honest patterns (`--yolo`, a vendor's `curl | sh` installer) are shown too, at a lower severity.
 
-It flags hidden text, remote code execution, credential access, permission bypasses, persistence and concealment before an agent ever reads them. Antivirus looks for known malicious *code*; skillward looks at the *instructions* — in a scan of ~2,900 public repos, antivirus removed 4 of 164 files from a known skill-malware campaign, the ones that carried the payload inline; skillward flagged all of them.
+It flags hidden text, remote code execution, credential access, permission bypasses, persistence and concealment before an agent ever reads them. Antivirus looks for known malicious *code*; skillward looks at the *instructions*. In our scan of ~2,900 public repositories (October 2026), Windows Defender quarantined 4 files from the ClawHavoc skill-malware campaign — the ones that carried their payload inline. It left 160 more copies in place, whose instructions only point at the payload (a password-protected download, a paste-site command); skillward flags those. Its checks for these two shapes were written after studying the campaign.
 
 ## Safety guarantees
 
@@ -19,6 +19,9 @@ It flags hidden text, remote code execution, credential access, permission bypas
 - Symbolic links are never followed.
 - Everything printed from scanned files is escaped: invisible and control characters are shown as `<U+202E>`, so the report itself can't hide text or inject terminal escape sequences.
 - Snippets are short and truncated; secrets, tokens and encoded blobs are never printed in full.
+- Hostile input can't hang a scan: every rule is tested to stay linear on crafted long lines.
+
+Found a security bug in skillward itself? Please report it privately — see [SECURITY.md](SECURITY.md).
 
 ## Usage
 

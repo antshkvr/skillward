@@ -11,7 +11,7 @@ First public release.
 - SW010 catches the ClawHavoc malware shapes: prerequisites that download a password-protected archive, and paste-site pages next to "run it in Terminal".
 - Other agents: Cursor (`.cursorrules`, `.cursor/rules/*.mdc`, commands, `.cursor/mcp.json`, `.cursor/hooks.json`), GitHub Copilot / VS Code (`copilot-instructions.md`, `*.instructions.md`, `*.prompt.md`, chat modes, agents, `.vscode/mcp.json`), Gemini CLI (`GEMINI.md`, `.gemini/settings.json`, TOML commands), Windsurf, Cline and Kiro files are discovered and checked by the same rules.
 - Hook targets: scripts that hooks run are scanned and locked with the hook file; SW017 flags obfuscated, binary, huge or minified hook scripts.
-- No quadratic work on minified one-line files.
+- Robust on hostile input: very long lines are split for rule matching, snippets read a window around the match, and pipeline patterns are bounded — every rule stays linear (a 6.6 KB crafted line no longer takes 6.7 s in SW004).
 
 **Output**
 - `explain`: what each skill, MCP server and config lets the agent do — runs code from the internet, turns approvals off, reads secrets, sends data out, persists, hides things, runs automatically… — with the worst severity and where it shows.

@@ -14,6 +14,12 @@ const END = String.raw`(?![\w-]|\.\w)`;
 const PREFIX = String.raw`(?:(?:sudo|doas)(?:\s+-{1,2}[\w-]+)*\s+)?(?:env\s+(?:\w+=\S*\s+)*)?`;
 /** One pipeline stage's text: no newline, `|`, `;` or `&&`. */
 const STAGE = String.raw`(?:(?!&&)[^|\n;])`;
+/**
+ * Bounds for how far a pipeline is followed. Unbounded and overlapping `STAGE*?…STAGE*` made a line with many `curl`s
+ * cubic (a 6.6 KB line took 6.7 s); real pipelines are short.
+ */
+const STAGE_MAX = 500;
+const MAX_STAGES = 8;
 /** What follows the command name when it reads code from stdin, not data for a script. */
 const STDIN_CODE = String.raw`(?=\s*(?:$|-(?:\s|$)|[;&|)]|["'\x60](?=\s|$|[;&|)])))`;
 /**
@@ -34,7 +40,7 @@ const PATTERNS: Pattern[] = [
   {
     // curl -fsSL https://… | sudo bash -s --   (intermediate stages like `| tee log |` allowed)
     re: new RegExp(
-      String.raw`(?<![\w.-])${FETCH}\s+${STAGE}*?[^|\s;&]${STAGE}*(?:\|(?!\|)${STAGE}*)*?(?<!\|)\|(?!\|)\s*${PREFIX}${PIPE_TARGET}`,
+      String.raw`(?<![\w.-])${FETCH}\s+[^|\s;&]${STAGE}{0,${STAGE_MAX}}(?:\|(?!\|)${STAGE}{0,${STAGE_MAX}}){0,${MAX_STAGES}}?(?<!\|)\|(?!\|)\s*${PREFIX}${PIPE_TARGET}`,
       "gi",
     ),
     label: "remote download piped into a shell",
@@ -56,7 +62,7 @@ const PATTERNS: Pattern[] = [
   {
     // <download cmdlet> https://… | <expression cmdlet>
     re: new RegExp(
-      String.raw`(?<![\w.-])(?:${vocab("psFetch")}|curl|wget)\b[^|\n]*(?:\|(?!\|)[^|\n]*)*?\|\s*${vocab("psEval")}\b`,
+      String.raw`(?<![\w.-])(?:${vocab("psFetch")}|curl|wget)\b[^|\n]{0,${STAGE_MAX}}(?:\|(?!\|)[^|\n]{0,${STAGE_MAX}}){0,${MAX_STAGES}}?\|\s*${vocab("psEval")}\b`,
       "gi",
     ),
     label: "PowerShell download piped into execution",
