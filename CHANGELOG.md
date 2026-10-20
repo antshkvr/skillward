@@ -6,7 +6,7 @@ First public release.
 
 **Scanning**
 - `scan`: discovers skills (`SKILL.md` folders), `CLAUDE.md`/`CLAUDE.local.md`/`AGENTS.md`, `.claude/commands` and `agents`, `.mcp.json`, Claude Code settings and hooks, plugin manifests and hooks; `--global` adds `~/.claude` and the `mcpServers` of `~/.claude.json`.
-- 15 rules: SW001 hidden-unicode, SW002 html-comment-instructions, SW003 encoded-payload, SW004 pipe-to-shell, SW005 secret-path-access, SW006 env-dump, SW007 suspicious-egress, SW008 permission-bypass, SW009 concealment, SW010 fake-prerequisite, SW011 unpinned-mcp, SW012 remote-mcp, SW013 hook-command, SW014 persistence, SW015 dangerous-script.
+- 16 rules: SW001 hidden-unicode, SW002 html-comment-instructions, SW003 encoded-payload, SW004 pipe-to-shell, SW005 secret-path-access, SW006 env-dump, SW007 suspicious-egress, SW008 permission-bypass, SW009 concealment, SW010 fake-prerequisite, SW011 unpinned-mcp, SW012 remote-mcp, SW013 hook-command, SW014 persistence, SW015 dangerous-script, SW016 secret-in-config.
 - Severities calibrated on ~2,900 public repositories with agent configuration: warnings, deny lists, guard hooks, detectors, script comments, CLI option docs and quoted examples are low/info; prose mentions of bypass flags and official vendor installers are medium; executable instructions stay high.
 - SW010 catches the ClawHavoc malware shapes: prerequisites that download a password-protected archive, and paste-site pages next to "run it in Terminal".
 - No quadratic work on minified one-line files.

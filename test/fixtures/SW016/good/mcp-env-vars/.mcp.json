@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "tracker": {
+      "command": "node",
+      "args": ["./servers/tracker.js"],
+      "env": { "TRACKER_API_KEY": "${TRACKER_API_KEY}", "TRACKER_URL": "https://api.example.invalid" }
+    }
+  }
+}

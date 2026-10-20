@@ -50,6 +50,7 @@ describe("capabilitiesOf", () => {
     ["SW003", "Base64 blob decodes to commands", ["concealment"]],
     ["SW009", "Hides activity from the user", ["concealment"]],
     ["SW011", "MCP server runs pkg via npx without a version", ["autorun"]],
+    ["SW016", "Contains a GitHub token.", ["secrets"]],
     ["SW099", "a rule from the future", []],
   ])("%s %s → %j", (ruleId, message, expected) => {
     expect(capabilitiesOf(finding(ruleId, message))).toEqual(expected);

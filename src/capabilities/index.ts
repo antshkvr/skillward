@@ -48,6 +48,8 @@ export function capabilitiesOf(finding: Finding): CapabilityId[] {
     case "SW004":
     case "SW010":
       return ["remote-code"];
+    case "SW016":
+      return ["secrets"];
     case "SW005":
     case "SW006":
       return /sends? (?:data|them) out/.test(m) ? ["secrets", "network"] : ["secrets"];

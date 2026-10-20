@@ -128,6 +128,7 @@ Capabilities: runs code from the internet · gives a remote host control · turn
 | SW013 | hook-command | medium | Every command hook and the status line command; high with network access or secret paths. |
 | SW014 | persistence | high | Writes to shell rc files, crontab, launchd, systemd, Windows autoruns, `authorized_keys`, git hooks, `~/.claude` settings and other `CLAUDE.md`/`AGENTS.md`. |
 | SW015 | dangerous-script | high | In scripts and code blocks: eval/exec of downloaded or decoded code, `rm -rf ~`, disk wiping, download-then-execute, Windows LOLBins, encoded PowerShell, reverse shells. |
+| SW016 | secret-in-config | high | Credentials written into agent configuration: AWS, GitHub, GitLab, Slack, OpenAI, Anthropic, Stripe, Google, npm, Hugging Face and other provider tokens, Slack/Discord webhook URLs (high); secret-looking values for secret-named keys and `Authorization: Bearer …` (medium). Common in `settings.local.json`, which saves allowed commands verbatim. Values are never printed — only the first 4 characters and the length. |
 
 The severity in the table is the rule's default; individual findings go up or down with the evidence. Each finding also has a `confidence`. Phrase rules (SW002, SW008, SW009, SW010) are heuristics in English and Russian: a low-confidence finding is worth a look, not proof of malice. Exact behavior per rule is documented in [SPEC.md](SPEC.md#6-rule-catalog-v01).
 

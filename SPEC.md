@@ -94,7 +94,7 @@ listed files (used by the Action on pull requests).
 **`explain` (v0.1).** The permissions-screen view of a scan (section 1): the same findings (suppressed ones left out),
 grouped per target into capabilities — runs code from the internet (SW004, SW010, SW015 remote-eval/download/LOLBins),
 gives a remote host control (reverse shells), turns approvals off (SW008), reads credentials or secrets (SW005, SW006,
-embedded keys/tokens in SW003), sends data out or contacts unusual hosts (SW007, SW012, SW005/SW006 with egress, high
+SW016, embedded keys/tokens in SW003), sends data out or contacts unusual hosts (SW007, SW012, SW005/SW006 with egress, high
 SW013 hooks), persists after the session (SW014), can destroy data (SW015 destructive), hides things from you (SW001,
 SW002, SW009, encoded content in SW003/SW015), runs automatically (SW013, SW011). Each capability shows its worst
 severity and up to three distinct places (relative to the target). Targets are sorted worst first; targets with
@@ -206,6 +206,7 @@ discovery  →  parsers  →  rule engine  →  reporters
 | SW013 | hook-command | medium | Hooks that run commands; high with network access or secrets |
 | SW014 | persistence | high | Writes to `~/.bashrc`, `~/.zshrc`, crontab, launchd, `~/.claude/settings*`, other `CLAUDE.md` files |
 | SW015 | dangerous-script | high | In skill scripts: `eval` of downloaded code, `rm -rf ~`, running downloaded files |
+| SW016 | secret-in-config | high | Provider tokens and webhook URLs with tokens in agent configs; secret-looking values for secret-named keys |
 
 **Rule principles**
 - Phrase rules (SW002, SW008, SW009, SW010) are heuristics with English and Russian vocabularies, extensible.
@@ -305,6 +306,18 @@ a prose mention without a command → medium; official installers of well-known 
   a multi-line finding. Guard-hook block lists, deny lists, comments and test files are lowered; cheat-sheet
   placeholders (`ATTACKER_IP`) → `medium`/`low`. Quiet on `eval "$(ssh-agent -s)"`, `eval "$(brew shellenv)"`,
   `rm -rf ./build`.
+- SW016: provider tokens by exact format (AWS access key IDs, GitHub, GitLab, Slack tokens and webhook URLs, Discord
+  webhooks, OpenAI, Anthropic, Stripe live, Google API, npm, PyPI, Hugging Face, SendGrid, Telegram bot, DigitalOcean,
+  Shopify) → `high`/`high`; a value assigned to a secret-named key (`api_key`, `*_TOKEN`, `--token`, `Authorization:
+  Bearer`) → `medium`/`medium` only when it looks generated (letters and digits, entropy ≥3.5, not a word, path or
+  identifier) **in real configuration** (JSON configs, `.env` files, scripts); the same in markdown docs → `low` (usually an
+  example). Tokens in the scanned repository's own test files (`tests/`, `*.test.*`, `test_*.py`, `fixtures/`) → `low`.
+  Ignored: placeholders (`your-…`, `FAKE`, `example`, `xxxx`, `<…>`, sequences like `1234`/`abcd`, example words like
+  `secure`/`password`), variables (`$X`, `${X}`), AWS documentation keys, URL query parameters (`?…&token=`), names that
+  hold something else (`tokenAddress`, `max_tokens`, `hashed_secret`, `tokenizer`), chain addresses and JWTs (SW003).
+  Corpus: 82 high / 97 medium across 2,917 repositories — live Slack webhooks, Anthropic/Perplexity keys in `.mcp.json`,
+  `ANTHROPIC_AUTH_TOKEN` in `settings.local.json`. The snippet shows only the first 4 characters and the length. Private keys and JWTs stay in SW003.
+  Test fixtures use generic forms only; provider-format tokens are generated at test run time, never committed.
 - Known limitation of phrase rules: a phrase matches within one logical line.
 - `~/.claude.json` (`--global`): every line outside `mcpServers` (top-level and per project) is blanked, keeping line
   numbers; the JSON value is reduced to those sections and findings are limited to them. History is never scanned.
@@ -485,5 +498,6 @@ paste-site command) are still redistributed in GitHub mirrors months after the r
 - [ ] **First npm release** (0.1.1).
 - [ ] **Responsible disclosure** of corpus findings; publish the report and launch.
 - [ ] **Corpus rerun** without the gaps above.
-- [ ] **New checks:** secrets in agent configs; the script a hook runs (size, minification, obfuscation).
+- [x] **SW016 secret-in-config.**
+- [ ] **Hook targets:** check the script a hook runs (size, minification, obfuscation).
 - [ ] **v0.2 sandbox:** container, proxy, honeytokens, agent run, tool-call logging, verdicts, report.
