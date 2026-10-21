@@ -1,10 +1,11 @@
 import { createColors } from "picocolors";
 import { meetsThreshold } from "../engine/index.js";
 import { escapeInvisible } from "../text.js";
+import { configNotes } from "./config-note.js";
 import { SEVERITIES, type Finding, type Severity } from "../types.js";
 import type { Reporter } from "./types.js";
 
-export const textReporter: Reporter = ({ result, failOn, color }) => {
+export const textReporter: Reporter = ({ result, failOn, color, config }) => {
   const c = createColors(color);
   const paint: Record<Severity, (s: string) => string> = {
     high: (s) => c.bold(c.red(s)),
@@ -49,6 +50,8 @@ export const textReporter: Reporter = ({ result, failOn, color }) => {
     if (stale) out.push(c.dim(`${stale} baseline entr${stale === 1 ? "y" : "ies"} no longer match: fixed or changed. Refresh it with --write-baseline.`));
     if (known.length || stale) out.push("");
   }
+  const notes = configNotes(config, result.root, color);
+  if (notes.length) out.push(...notes, "");
   for (const s of result.skipped) out.push(c.dim(`skipped ${escapeInvisible(s.path)}: ${s.reason}`));
   for (const e of result.errors) {
     out.push(c.red(`error ${e.ruleId ? `in ${e.ruleId} ` : ""}on ${escapeInvisible(e.path)}: ${e.message}`));

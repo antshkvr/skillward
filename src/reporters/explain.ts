@@ -1,6 +1,7 @@
 import { createColors } from "picocolors";
 import { CAPABILITIES, type TargetCapabilities } from "../capabilities/index.js";
 import { escapeInvisible } from "../text.js";
+import { configJson, type ConfigInfo } from "./config-note.js";
 import type { Severity } from "../types.js";
 import { VERSION } from "../version.js";
 
@@ -20,7 +21,11 @@ const SHORT: Record<string, string> = {
   autorun: "autorun",
 };
 
-export function explainText(root: string, targets: TargetCapabilities[], options: { color: boolean; all: boolean }): string {
+export function explainText(
+  root: string,
+  targets: TargetCapabilities[],
+  options: { color: boolean; all: boolean; notes?: string[] },
+): string {
   const c = createColors(options.color);
   const paint: Record<Severity, (s: string) => string> = {
     high: (s) => c.bold(c.red(s)),
@@ -54,6 +59,7 @@ export function explainText(root: string, targets: TargetCapabilities[], options
   const quiet = targets.length - notable.length;
   if (!options.all && quiet > 0) out.push(c.dim(`${quiet} more target(s) with nothing notable (--all lists them).`), "");
 
+  if (options.notes?.length) out.push(...options.notes, "");
   if (!targets.length) {
     out.push(`No agent configuration found under ${escapeInvisible(root)}.`);
     return out.join("\n") + "\n";
@@ -77,6 +83,8 @@ function placeIn(target: string, file: string, line: number): string {
   return `${file}:${line}`;
 }
 
-export function explainJson(root: string, targets: TargetCapabilities[]): string {
-  return JSON.stringify({ version: EXPLAIN_REPORT_VERSION, tool: { name: "skillward", version: VERSION }, root, targets }, null, 2) + "\n";
+export function explainJson(root: string, targets: TargetCapabilities[], config?: ConfigInfo): string {
+  const tool = { name: "skillward", version: VERSION };
+  const report = { version: EXPLAIN_REPORT_VERSION, tool, root, ...(config ? { config: configJson(config) } : {}), targets };
+  return JSON.stringify(report, null, 2) + "\n";
 }

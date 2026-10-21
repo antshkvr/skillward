@@ -79,9 +79,10 @@ skillward scan [path]          # current directory by default
   --config <file>
   --baseline <file>            # report only findings not in the baseline
   --write-baseline <file>      # record current findings as the baseline, exit 0
+  --untrusted                  # someone else's code: ignore its config, skillward-ignore comments, .gitignore
 
 skillward explain [path]       # what each target lets the agent do (capability summary)
-  --global  --all  --format text|json  --output <file>  --config <file>
+  --global  --all  --untrusted  --format text|json  --output <file>  --config <file>
 
 skillward lock [path]          # create/update skillward.lock
 skillward verify [path]        # compare with the lockfile, show a diff
@@ -254,7 +255,7 @@ discovery  →  parsers  →  rule engine  →  reporters
   - Suppressed findings don't silently disappear: they are listed separately (`suppressed` in text and JSON, SARIF
     `suppressions` of kind `inSource`) and don't affect the exit code — a malicious skill could add such comments
     itself.
-  - For auditing third-party skills: `--no-inline-ignore` or `"inlineIgnore": false` in the config.
+  - For auditing third-party skills: `--untrusted` (section 9), or just `--no-inline-ignore`.
 - Every rule has fixtures: at least 2 "bad" and 2 similar "good" examples.
 - The severity in the table is the default (also shown by `skillward rules` and in SARIF `defaultConfiguration`).
   A finding can be higher or lower depending on the evidence. `rules` in the config replaces the severity of all of a
@@ -449,6 +450,16 @@ to do.
 - Unknown keys and wrong types are errors (exit `2`); an unknown rule ID in `rules` is allowed (the config may be
   written for a newer version).
 - The config is looked up in the scan root, or given with `--config <file>`. It is plain JSON and never executed.
+- **The scanned folder's config is untrusted when the folder is someone else's.** It could turn off exactly the rules
+  its skills trip, or `ignore` their paths; `skillward-ignore` comments and `.gitignore` (which decides what is walked
+  outside agent directories) are the same kind of lever. So:
+  - Reports always say what the applied config hides: a text line `Config <path>: turns off …; sets severity …;
+    ignores …` (with a hint to use `--untrusted` when the config came from the scanned folder), and a `config`
+    section in the JSON of `scan` and `explain`. In the Action, this line lands in the job summary, so a pull request
+    that edits the config to hide its own finding is visible.
+  - `scan`/`explain --untrusted`: the scanned folder's `skillward.config.json` isn't read (the report says it was
+    skipped), inline suppressions are off, `.gitignore` files are not respected. An explicit `--config` is the user's
+    own and still applies. A baseline is only ever read from `--baseline`.
 
 ## 10. GitHub Action
 
@@ -538,6 +549,7 @@ paste-site command) are still redistributed in GitHub mirrors months after the r
 - [x] **Release workflow** with npm trusted publishing.
 - [x] **`explain`:** capability summary per target (the permissions-screen view).
 - [x] **Baseline:** `scan --write-baseline` / `--baseline`, Action input `baseline`.
+- [x] **`--untrusted`** for someone else's code; reports say what the config hides.
 - [ ] **First npm release** (0.1.1).
 - [ ] **Responsible disclosure** of corpus findings; publish the report and launch.
 - [ ] **Corpus rerun** without the gaps above.

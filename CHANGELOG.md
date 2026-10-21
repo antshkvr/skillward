@@ -21,7 +21,8 @@ First public release.
 **Pinning and config**
 - `lock` / `verify`: `skillward.lock` with sha256 per file, snapshots for text diffs, scan of changed files only.
 - `skillward.config.json`: `ignore`, `rules`, `failOn`, `inlineIgnore`.
-- Inline suppressions `skillward-ignore SWxxx: reason` (always reported separately), `--no-inline-ignore` for audits.
+- Inline suppressions `skillward-ignore SWxxx: reason` (always reported separately), `--no-inline-ignore` to ignore them.
+- `--untrusted` (`scan`, `explain`) for someone else's code: the scanned folder's config, `skillward-ignore` comments and `.gitignore` files don't count. Reports always say what the config in use turns off or ignores (text line, JSON `config`).
 - Baseline: `scan --write-baseline <file>` records current findings, `scan --baseline <file>` fails only on new ones (matched by rule, file and text, not line; hashes only, no snippets). Action input `baseline`.
 
 **CI**

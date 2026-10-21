@@ -1,19 +1,21 @@
 import { exitCodeFor } from "../engine/index.js";
 import { SEVERITIES, type Severity } from "../types.js";
 import { VERSION } from "../version.js";
+import { configJson } from "./config-note.js";
 import type { ReportContext, Reporter } from "./types.js";
 
 /** Version of the JSON report format. Bump on breaking changes; adding fields is not breaking. */
 export const JSON_REPORT_VERSION = 1;
 
 /** The JSON report as an object (also embedded in the `verify` JSON report). */
-export function jsonReport({ result, failOn }: ReportContext) {
+export function jsonReport({ result, failOn, config }: ReportContext) {
   const bySeverity = Object.fromEntries(SEVERITIES.map((s) => [s, 0])) as Record<Severity, number>;
   for (const f of result.findings) bySeverity[f.severity]++;
   return {
     version: JSON_REPORT_VERSION,
     tool: { name: "skillward", version: VERSION },
     root: result.root,
+    ...(config ? { config: configJson(config) } : {}),
     summary: {
       targets: result.targets.length,
       files: result.targets.reduce((n, t) => n + t.files.length, 0),

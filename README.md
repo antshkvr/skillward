@@ -36,6 +36,7 @@ npx skillward scan --format sarif --output skillward.sarif
 npx skillward scan --fail-on medium
 
 npx skillward explain              # what each skill / MCP server / config lets the agent do
+npx skillward explain path/to/their-repo --untrusted   # someone else's code: their config and ignores don't count
 
 npx skillward lock                 # pin current agent files in skillward.lock
 npx skillward verify               # diff against skillward.lock and scan what changed
@@ -51,7 +52,8 @@ npx skillward rules                # list rules
 | `--output <file>` | stdout | Write the report to a file |
 | `--fail-on info\|low\|medium\|high` | `high` | Lowest severity that makes the exit code `1` |
 | `--config <file>` | `skillward.config.json` in the scan root | Config file |
-| `--no-inline-ignore` | | Ignore `skillward-ignore` comments — use when auditing third-party skills |
+| `--untrusted` | | Someone else's code: don't read the scanned folder's `skillward.config.json`, `skillward-ignore` comments or `.gitignore` files (an explicit `--config` still applies) |
+| `--no-inline-ignore` | | Ignore `skillward-ignore` comments only |
 | `--files-from <file>` | | Only report findings in the listed files (one path per line, relative to the current directory; `#` comments allowed) — e.g. the output of `git diff --name-only` |
 | `--baseline <file>` | | Report only findings that are not in this baseline (see [Baseline](#baseline)) |
 | `--write-baseline <file>` | | Record the current findings as the baseline and exit `0` |
@@ -75,7 +77,7 @@ The permissions-screen view: the same findings as `scan`, grouped per target int
 
 Capabilities: runs code from the internet · gives a remote host control · turns approvals off · reads credentials or secrets · sends data out or contacts unusual hosts · persists after the session · can destroy data · hides things from you · runs automatically. Each shows its worst severity and where it appears.
 
-`explain` is informational: it exits `0` once the summary is printed (`2` on errors) — gate CI with `scan --fail-on`. Options: `--global`, `--all` (also list targets with nothing notable), `--format text|json` (JSON format version 1), `--output`, `--config`, `--no-inline-ignore`, `--no-color`.
+`explain` is informational: it exits `0` once the summary is printed (`2` on errors) — gate CI with `scan --fail-on`. Options: `--global`, `--all` (also list targets with nothing notable), `--untrusted`, `--format text|json` (JSON format version 1), `--output`, `--config`, `--no-inline-ignore`, `--no-color`.
 
 **Exit codes:** `0` — clean or below threshold; `1` — findings at or above `--fail-on`; `2` — run error (bad path, bad config, a rule crashed).
 
@@ -163,7 +165,7 @@ Severities were calibrated on a corpus of ~2,900 public repositories with agent 
 | **low** | The same patterns in documentation: CLI option tables, script comments, quoted examples, credential files mentioned without a read, hooks that start a script from the project. | Inventory. Useful when auditing third-party skills. |
 | **info** | Warnings and protections: "never run `curl \| sh`", deny lists, guard hooks that block dangerous commands, detectors. | Nothing — listed so you can see what was considered. |
 
-`confidence` says how sure the match is about what it found; severity says how bad it is if it is right. Offensive-security skills (pentest cheat-sheets, privilege-escalation guides) legitimately contain high findings — installing one is a choice, not an accident. When auditing someone else's skills, use `--no-inline-ignore` so their `skillward-ignore` comments can't hide anything.
+`confidence` says how sure the match is about what it found; severity says how bad it is if it is right. Offensive-security skills (pentest cheat-sheets, privilege-escalation guides) legitimately contain high findings — installing one is a choice, not an accident. When auditing someone else's skills, use `--untrusted` so their config, `skillward-ignore` comments and `.gitignore` can't hide anything.
 
 ## Suppressing findings
 
@@ -177,7 +179,7 @@ For security docs that show attacks on purpose, add a comment with the rule IDs 
 - At the end of a line (`curl … | sh  # skillward-ignore SW004: vendored installer`), it applies to that line. Any comment syntax works: `<!-- -->`, `#`, `//`, `/* */`.
 - `skillward-ignore-file SW001: reason` applies to the whole file.
 
-Rule IDs are mandatory — there is no "ignore everything". Suppressed findings don't affect the exit code but are **always listed** in the report (and as SARIF `suppressions`), because a malicious skill can add these comments too. When auditing third-party skills, pass `--no-inline-ignore`.
+Rule IDs are mandatory — there is no "ignore everything". Suppressed findings don't affect the exit code but are **always listed** in the report (and as SARIF `suppressions`), because a malicious skill can add these comments too. When auditing third-party skills, pass `--untrusted`.
 
 To exclude whole paths, use `ignore` in the config.
 
@@ -214,6 +216,8 @@ npx skillward scan --baseline skillward.baseline.json         # in CI: exit 1 on
 - `failOn` — default for `--fail-on`; the flag wins.
 - `inlineIgnore` — honour `skillward-ignore` comments (default `true`).
 
+A config can hide findings, so the text report always says what the one in use turns off or ignores, and JSON reports include it as `config`. A repository you didn't write can ship its own `skillward.config.json`: scan it with `--untrusted`, which doesn't read it.
+
 ## Output formats
 
 ### JSON
@@ -225,6 +229,7 @@ npx skillward scan --baseline skillward.baseline.json         # in CI: exit 1 on
   "version": 1,
   "tool": { "name": "skillward", "version": "0.1.1" },
   "root": "/abs/path/to/project",
+  "config": { "path": null, "untrusted": false, "rules": {}, "ignore": [], "inlineIgnore": true },
   "summary": {
     "targets": 3, "files": 5, "findings": 1, "suppressed": 0, "baselined": 0,
     "bySeverity": { "info": 0, "low": 0, "medium": 0, "high": 1 },

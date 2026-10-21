@@ -28,6 +28,8 @@ export interface ScanOptions {
   onlyFiles?: Set<string>;
   /** Known findings (from `--baseline`): matching ones are reported separately and don't affect the exit code. */
   baseline?: Baseline;
+  /** Respect `.gitignore` files in the scanned folder (default true). */
+  gitignore?: boolean;
 }
 
 export interface ScannedTarget {
@@ -63,6 +65,7 @@ export async function scan(options: ScanOptions): Promise<ScanResult> {
     ignore: options.config.ignore,
     global: options.global,
     homeDir: options.homeDir,
+    gitignore: options.gitignore,
   });
 
   const findings: Finding[] = [];

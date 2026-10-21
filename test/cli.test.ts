@@ -68,7 +68,9 @@ describe("cli", () => {
     writeFileSync(config, JSON.stringify({ rules: { SW004: "off" } }));
     const { code, stdout } = await cli(["scan", dangerous, "--config", config]);
     expect(code).toBe(0);
-    expect(stdout).not.toContain("SW004");
+    expect(stdout).not.toMatch(/highs+SW004/);
+    expect(stdout).toContain("custom.json: turns off SW004.");
+    expect(stdout).not.toContain("Pass --untrusted");
   });
 
   it("limits findings to --files-from (pull request mode)", async () => {

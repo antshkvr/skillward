@@ -14,6 +14,8 @@ export interface DiscoveryOptions {
   global?: boolean;
   /** Overrides the home directory (tests). */
   homeDir?: string;
+  /** Respect `.gitignore` files (default true). Off for `--untrusted`: the scanned folder's own files decide nothing. */
+  gitignore?: boolean;
 }
 
 export interface DiscoveryResult {
@@ -72,7 +74,7 @@ export async function discover(options: DiscoveryOptions): Promise<DiscoveryResu
     }
   } else if (inputStat.isDirectory()) {
     root = input;
-    const files = await walk(root, { configIgnore: options.ignore ?? [], useGitignore: true }, skipped);
+    const files = await walk(root, { configIgnore: options.ignore ?? [], useGitignore: options.gitignore !== false }, skipped);
     targets.push(...classify(files, skipped));
   } else {
     throw new DiscoveryError(`not a file or directory: ${options.path}`);

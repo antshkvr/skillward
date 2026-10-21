@@ -1,15 +1,16 @@
 #!/usr/bin/env node
 import { realpathSync } from "node:fs";
 import { readFile, stat, writeFile } from "node:fs/promises";
-import { resolve } from "node:path";
+import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { Command, CommanderError, Option } from "commander";
 import { BaselineError, readBaseline, writeBaseline } from "./baseline/index.js";
 import { explain } from "./capabilities/index.js";
-import { ConfigError, loadConfig, type Config } from "./config/index.js";
+import { CONFIG_FILE_NAME, ConfigError, DEFAULT_CONFIG, loadConfig, type Config } from "./config/index.js";
 import { DiscoveryError } from "./discovery/index.js";
 import { exitCodeFor, scan } from "./engine/index.js";
 import { lock, LOCK_FILE_NAME, LockError, verify } from "./lock/index.js";
+import { configNotes, type ConfigInfo } from "./reporters/config-note.js";
 import { explainJson, explainText } from "./reporters/explain.js";
 import { REPORTERS, type ReportFormat } from "./reporters/index.js";
 import { verifyJson, verifyText } from "./reporters/verify.js";
@@ -41,6 +42,9 @@ export const EXIT_OK = 0;
 export const EXIT_FINDINGS = 1;
 export const EXIT_ERROR = 2;
 
+const UNTRUSTED_HELP =
+  "someone else's code: don't read its skillward.config.json, skillward-ignore comments or .gitignore files (an explicit --config still applies)";
+
 interface CommonFlags {
   format: ReportFormat;
   output?: string;
@@ -54,6 +58,7 @@ interface ExplainFlags extends Omit<CommonFlags, "format" | "failOn"> {
   format: "text" | "json";
   global?: boolean;
   all?: boolean;
+  untrusted?: boolean;
 }
 
 interface ScanFlags extends CommonFlags {
@@ -61,6 +66,7 @@ interface ScanFlags extends CommonFlags {
   filesFrom?: string;
   baseline?: string;
   writeBaseline?: string;
+  untrusted?: boolean;
 }
 
 export async function run(argv: string[], io: CliIO = defaultIO): Promise<number> {
@@ -89,6 +95,7 @@ export async function run(argv: string[], io: CliIO = defaultIO): Promise<number
       .description("scan a project (default: current directory) for dangerous agent instructions")
       .argument("[path]", "file or directory to scan", ".")
       .option("--global", "also scan ~/.claude and the MCP servers in ~/.claude.json")
+      .option("--untrusted", UNTRUSTED_HELP)
       .option("--files-from <file>", "only report findings in the files listed in <file> (one path per line, relative to the current directory); used for pull requests")
       .option("--baseline <file>", "report only findings that are not in this baseline (known findings are listed separately)")
       .option("--write-baseline <file>", "record the current findings as the baseline in <file> and exit 0"),
@@ -105,6 +112,7 @@ export async function run(argv: string[], io: CliIO = defaultIO): Promise<number
     .option("--output <file>", "write the report to a file instead of stdout")
     .option("--global", "also explain ~/.claude and the MCP servers in ~/.claude.json")
     .option("--all", "also list targets with nothing notable")
+    .option("--untrusted", UNTRUSTED_HELP)
     .option("--config <file>", `config file (default: skillward.config.json in the scan root)`)
     .option("--no-inline-ignore", "ignore skillward-ignore comments (use when auditing third-party skills)")
     .option("--no-color", "disable colors")
@@ -183,16 +191,34 @@ function withFlags(config: Config, flags: CommonFlags): Config {
   return flags.inlineIgnore === false ? { ...config, inlineIgnore: false } : config;
 }
 
+/**
+ * Loads the config for scan/explain. With `--untrusted` the scanned folder's own config is not read: it could turn
+ * rules off or ignore the very paths that matter. Either way the reports say which config was used and what it hid.
+ */
+async function scanConfig(root: string, flags: CommonFlags & { untrusted?: boolean }): Promise<ConfigInfo> {
+  const dir = (await isDirectory(root)) ? root : undefined;
+  const untrusted = Boolean(flags.untrusted);
+  if (untrusted && !flags.config) {
+    const local = dir ? join(dir, CONFIG_FILE_NAME) : undefined;
+    const ignoredPath = local && (await stat(local).then((s) => s.isFile(), () => false)) ? local : undefined;
+    return { config: { ...DEFAULT_CONFIG, inlineIgnore: false }, untrusted, ...(ignoredPath ? { ignoredPath } : {}) };
+  }
+  const loaded = await loadConfig({ configPath: flags.config, root: dir });
+  const config = withFlags(loaded.config, untrusted ? { ...flags, inlineIgnore: false } : flags);
+  return { config, untrusted, ...(loaded.path ? { path: loaded.path, fromScannedFolder: !flags.config } : {}) };
+}
+
 async function runScan(path: string, flags: ScanFlags, io: CliIO): Promise<number> {
   const root = resolve(path);
-  const loaded = await loadConfig({ configPath: flags.config, root: (await isDirectory(root)) ? root : undefined });
-  const config = withFlags(loaded.config, flags);
+  const info = await scanConfig(root, flags);
+  const config = info.config;
+  const gitignore = !flags.untrusted;
   const failOn = flags.failOn ?? config.failOn ?? "high";
   if (flags.writeBaseline) {
     if (flags.filesFrom || flags.baseline) {
       throw new ConfigError("--write-baseline records every current finding; it can't be combined with --files-from or --baseline");
     }
-    const result = await scan({ path, global: flags.global, homeDir: io.homeDir, config });
+    const result = await scan({ path, global: flags.global, homeDir: io.homeDir, config, gitignore });
     if (result.errors.length > 0) {
       for (const e of result.errors) io.stderr(`skillward: error ${e.ruleId ? `in ${e.ruleId} ` : ""}on ${e.path}: ${e.message}
 `);
@@ -205,9 +231,9 @@ async function runScan(path: string, flags: ScanFlags, io: CliIO): Promise<numbe
   }
   const onlyFiles = flags.filesFrom ? await readFileList(flags.filesFrom) : undefined;
   const baseline = flags.baseline ? await readBaseline(flags.baseline) : undefined;
-  const result = await scan({ path, global: flags.global, homeDir: io.homeDir, config, onlyFiles, baseline });
+  const result = await scan({ path, global: flags.global, homeDir: io.homeDir, config, onlyFiles, baseline, gitignore });
 
-  const report = REPORTERS[flags.format]({ result, failOn, color: useColor(flags, io) });
+  const report = REPORTERS[flags.format]({ result, failOn, color: useColor(flags, io), config: info });
   await emit(report, flags, io);
   if (result.errors.length > 0) return EXIT_ERROR;
   return exitCodeFor(result.findings, failOn);
@@ -216,14 +242,14 @@ async function runScan(path: string, flags: ScanFlags, io: CliIO): Promise<numbe
 /** Informational: exit 0 once the summary is printed (CI gates on `scan --fail-on`), 2 on run errors. */
 async function runExplain(path: string, flags: ExplainFlags, io: CliIO): Promise<number> {
   const root = resolve(path);
-  const loaded = await loadConfig({ configPath: flags.config, root: (await isDirectory(root)) ? root : undefined });
-  const config = withFlags(loaded.config, flags);
-  const result = await scan({ path, global: flags.global, homeDir: io.homeDir, config });
+  const info = await scanConfig(root, flags);
+  const result = await scan({ path, global: flags.global, homeDir: io.homeDir, config: info.config, gitignore: !flags.untrusted });
   const targets = explain(result);
+  const color = useColor({ ...flags, format: "text" }, io);
   const report =
     flags.format === "json"
-      ? explainJson(result.root, targets)
-      : explainText(result.root, targets, { color: useColor({ ...flags, format: "text" }, io), all: Boolean(flags.all) });
+      ? explainJson(result.root, targets, info)
+      : explainText(result.root, targets, { color, all: Boolean(flags.all), notes: configNotes(info, result.root, color) });
   await emit(report, flags, io);
   return result.errors.length > 0 ? EXIT_ERROR : EXIT_OK;
 }
