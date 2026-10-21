@@ -2,6 +2,7 @@ import { homedir } from "node:os";
 import { discover } from "../discovery/index.js";
 import { parseFile } from "../parsers/index.js";
 import { ALL_RULES } from "../rules/index.js";
+import { applyBaseline, type Baseline } from "../baseline/index.js";
 import type { Config } from "../config/index.js";
 import { applySuppressions, type SuppressedFinding } from "./suppressions.js";
 import {
@@ -25,6 +26,8 @@ export interface ScanOptions {
   rules?: Rule[];
   /** Only report findings in these files (absolute paths). Used by `verify` to scan what changed. */
   onlyFiles?: Set<string>;
+  /** Known findings (from `--baseline`): matching ones are reported separately and don't affect the exit code. */
+  baseline?: Baseline;
 }
 
 export interface ScannedTarget {
@@ -47,6 +50,8 @@ export interface ScanResult {
   findings: Finding[];
   /** Findings silenced by inline `skillward-ignore` comments. Never counted for the exit code. */
   suppressed: SuppressedFinding[];
+  /** Set when a baseline was applied: findings it matched, and its entries for scanned files that matched nothing. */
+  baseline?: { findings: Finding[]; stale: number };
   skipped: SkippedFile[];
   errors: ScanError[];
 }
@@ -67,6 +72,7 @@ export async function scan(options: ScanOptions): Promise<ScanResult> {
   const only = options.onlyFiles;
   const skipped = [...discovery.skipped];
   const targets: ScannedTarget[] = [];
+  const reportedFiles = new Set<string>();
 
   for (const target of discovery.targets) {
     if (only && !target.files.some((f) => only.has(f.absPath))) continue;
@@ -81,6 +87,7 @@ export async function scan(options: ScanOptions): Promise<ScanResult> {
 
     const parsed = { kind: target.kind, path: target.path, files };
     const reportable = new Set(files.filter((f) => !only || only.has(f.absPath)).map((f) => f.path));
+    for (const f of reportable) reportedFiles.add(f);
     const ranges = new Map(files.filter((f) => f.lineRanges).map((f) => [f.path, f.lineRanges!]));
     const targetFindings: Finding[] = [];
     for (const { rule, severity } of rules) {
@@ -112,12 +119,14 @@ export async function scan(options: ScanOptions): Promise<ScanResult> {
 
   findings.sort(compareFindings);
   suppressed.sort(compareFindings);
+  const known = options.baseline ? applyBaseline(findings, options.baseline, reportedFiles) : undefined;
   return {
     root: discovery.root,
     homeDir: options.homeDir ?? homedir(),
     targets,
-    findings,
+    findings: known ? known.active : findings,
     suppressed,
+    ...(known ? { baseline: { findings: known.baselined, stale: known.stale } } : {}),
     skipped,
     errors,
   };

@@ -106,6 +106,7 @@ process.exit(${exitCode});`,
       INPUT_PATH: "proj dir",
       INPUT_FAIL_ON: "medium",
       INPUT_CONFIG: "",
+      INPUT_BASELINE: "",
       SARIF_FILE: join(dir, "out.sarif"),
       FILES_FROM: join(dir, "changed.txt"),
       GITHUB_OUTPUT: output,
@@ -127,6 +128,12 @@ process.exit(${exitCode});`,
     expect(out).toContain("exit-code=1");
     expect(out).toContain("findings=2");
     expect(readFileSync(s.summary, "utf8")).toContain("&lt;script&gt;");
+  });
+
+  it("passes config and baseline paths as single arguments", () => {
+    const s = setup(0);
+    sh("scan.sh", [], { env: { ...s.env, FILES_FROM: "", INPUT_CONFIG: "my config.json", INPUT_BASELINE: "known; rm.json" } });
+    expect(s.calls()[0]).toEqual(["scan", "proj dir", "--fail-on", "medium", "--no-color", "--config", "my config.json", "--baseline", "known; rm.json", "--format", "sarif", "--output", s.env.SARIF_FILE]);
   });
 
   it("fails immediately on run errors and on invalid inputs", () => {

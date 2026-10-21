@@ -4,6 +4,7 @@ import { readFile, stat, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { Command, CommanderError, Option } from "commander";
+import { BaselineError, readBaseline, writeBaseline } from "./baseline/index.js";
 import { explain } from "./capabilities/index.js";
 import { ConfigError, loadConfig, type Config } from "./config/index.js";
 import { DiscoveryError } from "./discovery/index.js";
@@ -58,6 +59,8 @@ interface ExplainFlags extends Omit<CommonFlags, "format" | "failOn"> {
 interface ScanFlags extends CommonFlags {
   global?: boolean;
   filesFrom?: string;
+  baseline?: string;
+  writeBaseline?: string;
 }
 
 export async function run(argv: string[], io: CliIO = defaultIO): Promise<number> {
@@ -86,7 +89,9 @@ export async function run(argv: string[], io: CliIO = defaultIO): Promise<number
       .description("scan a project (default: current directory) for dangerous agent instructions")
       .argument("[path]", "file or directory to scan", ".")
       .option("--global", "also scan ~/.claude and the MCP servers in ~/.claude.json")
-      .option("--files-from <file>", "only report findings in the files listed in <file> (one path per line, relative to the current directory); used for pull requests"),
+      .option("--files-from <file>", "only report findings in the files listed in <file> (one path per line, relative to the current directory); used for pull requests")
+      .option("--baseline <file>", "report only findings that are not in this baseline (known findings are listed separately)")
+      .option("--write-baseline <file>", "record the current findings as the baseline in <file> and exit 0"),
     Object.keys(REPORTERS),
   ).action(async (path: string, flags: ScanFlags) => {
     exitCode = await guard(io, () => runScan(path, flags, io));
@@ -166,7 +171,7 @@ async function guard(io: CliIO, fn: () => Promise<number>): Promise<number> {
   try {
     return await fn();
   } catch (err) {
-    if (err instanceof ConfigError || err instanceof DiscoveryError || err instanceof LockError) {
+    if (err instanceof ConfigError || err instanceof DiscoveryError || err instanceof LockError || err instanceof BaselineError) {
       io.stderr(`skillward: ${err.message}\n`);
       return EXIT_ERROR;
     }
@@ -183,8 +188,24 @@ async function runScan(path: string, flags: ScanFlags, io: CliIO): Promise<numbe
   const loaded = await loadConfig({ configPath: flags.config, root: (await isDirectory(root)) ? root : undefined });
   const config = withFlags(loaded.config, flags);
   const failOn = flags.failOn ?? config.failOn ?? "high";
+  if (flags.writeBaseline) {
+    if (flags.filesFrom || flags.baseline) {
+      throw new ConfigError("--write-baseline records every current finding; it can't be combined with --files-from or --baseline");
+    }
+    const result = await scan({ path, global: flags.global, homeDir: io.homeDir, config });
+    if (result.errors.length > 0) {
+      for (const e of result.errors) io.stderr(`skillward: error ${e.ruleId ? `in ${e.ruleId} ` : ""}on ${e.path}: ${e.message}
+`);
+      return EXIT_ERROR;
+    }
+    await writeBaseline(flags.writeBaseline, result.findings);
+    io.stdout(`Recorded ${result.findings.length} finding(s) as the baseline → ${flags.writeBaseline}
+`);
+    return EXIT_OK;
+  }
   const onlyFiles = flags.filesFrom ? await readFileList(flags.filesFrom) : undefined;
-  const result = await scan({ path, global: flags.global, homeDir: io.homeDir, config, onlyFiles });
+  const baseline = flags.baseline ? await readBaseline(flags.baseline) : undefined;
+  const result = await scan({ path, global: flags.global, homeDir: io.homeDir, config, onlyFiles, baseline });
 
   const report = REPORTERS[flags.format]({ result, failOn, color: useColor(flags, io) });
   await emit(report, flags, io);

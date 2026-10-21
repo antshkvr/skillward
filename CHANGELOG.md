@@ -22,6 +22,7 @@ First public release.
 - `lock` / `verify`: `skillward.lock` with sha256 per file, snapshots for text diffs, scan of changed files only.
 - `skillward.config.json`: `ignore`, `rules`, `failOn`, `inlineIgnore`.
 - Inline suppressions `skillward-ignore SWxxx: reason` (always reported separately), `--no-inline-ignore` for audits.
+- Baseline: `scan --write-baseline <file>` records current findings, `scan --baseline <file>` fails only on new ones (matched by rule, file and text, not line; hashes only, no snippets). Action input `baseline`.
 
 **CI**
 - GitHub Action (`action.yml`): scan, SARIF upload to code scanning, job summary; on pull requests only changed files are reported (`scan --files-from`).

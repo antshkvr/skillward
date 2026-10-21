@@ -43,6 +43,12 @@ export const textReporter: Reporter = ({ result, failOn, color }) => {
     }
     out.push("");
   }
+  if (result.baseline) {
+    const { findings: known, stale } = result.baseline;
+    if (known.length) out.push(c.dim(`${known.length} known finding(s) from the baseline not shown (run without --baseline to see them).`));
+    if (stale) out.push(c.dim(`${stale} baseline entr${stale === 1 ? "y" : "ies"} no longer match: fixed or changed. Refresh it with --write-baseline.`));
+    if (known.length || stale) out.push("");
+  }
   for (const s of result.skipped) out.push(c.dim(`skipped ${escapeInvisible(s.path)}: ${s.reason}`));
   for (const e of result.errors) {
     out.push(c.red(`error ${e.ruleId ? `in ${e.ruleId} ` : ""}on ${escapeInvisible(e.path)}: ${e.message}`));
@@ -60,7 +66,7 @@ export const textReporter: Reporter = ({ result, failOn, color }) => {
       ),
     );
   } else if (result.findings.length === 0) {
-    out.push(c.green(`✔ No findings. ${scanned}.`));
+    out.push(c.green(`✔ No ${result.baseline ? "new " : ""}findings. ${scanned}.`));
   } else {
     const counts = [...SEVERITIES]
       .reverse()
@@ -70,7 +76,7 @@ export const textReporter: Reporter = ({ result, failOn, color }) => {
       .join(", ");
     const failing = result.findings.filter((f) => meetsThreshold(f.severity, failOn)).length;
     const verdict = failing > 0 ? c.red(`✖ ${failing} at or above --fail-on ${failOn}`) : c.green(`below --fail-on ${failOn}`);
-    out.push(`${result.findings.length} finding(s): ${counts}. ${scanned}. ${verdict}.`);
+    out.push(`${result.findings.length} ${result.baseline ? "new " : ""}finding(s): ${counts}. ${scanned}. ${verdict}.`);
   }
   return out.join("\n") + "\n";
 };

@@ -49,6 +49,7 @@ export function sarifReport(result: ScanResult, options: SarifOptions = {}): obj
     };
   };
 
+  const known = new Set<Finding>(result.baseline?.findings);
   const toResult = (f: Finding | SuppressedFinding) => {
     const loc = location(f);
     const fingerprint = createHash("sha256")
@@ -63,9 +64,12 @@ export function sarifReport(result: ScanResult, options: SarifOptions = {}): obj
       locations: [loc],
       partialFingerprints: { "skillward/v1": fingerprint },
       properties: { severity: f.severity, confidence: f.confidence },
+      ...(result.baseline && !suppression ? { baselineState: known.has(f) ? "unchanged" : "new" } : {}),
       ...(suppression
         ? { suppressions: [{ kind: "inSource", ...(suppression.reason ? { justification: suppression.reason } : {}) }] }
-        : {}),
+        : known.has(f)
+          ? { suppressions: [{ kind: "external", justification: "in the skillward baseline" }] }
+          : {}),
     };
   };
 
@@ -106,7 +110,7 @@ export function sarifReport(result: ScanResult, options: SarifOptions = {}): obj
             })),
           },
         ],
-        results: [...result.findings, ...result.suppressed].map(toResult),
+        results: [...result.findings, ...(result.baseline?.findings ?? []), ...result.suppressed].map(toResult),
       },
     ],
   };

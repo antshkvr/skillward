@@ -77,6 +77,8 @@ skillward scan [path]          # current directory by default
   --output <file>
   --fail-on info|low|medium|high   # exit-code threshold, high by default
   --config <file>
+  --baseline <file>            # report only findings not in the baseline
+  --write-baseline <file>      # record current findings as the baseline, exit 0
 
 skillward explain [path]       # what each target lets the agent do (capability summary)
   --global  --all  --format text|json  --output <file>  --config <file>
@@ -201,10 +203,21 @@ discovery  →  parsers  →  rule engine  →  reporters
       "targets": [{ "kind": "skill", "path": ".claude/skills/x", "files": ["..."] }],
       "findings": [ /* Finding */ ],
       "suppressed": [ /* Finding + suppression */ ],
+      "baselined": [ /* Finding: known, from --baseline */ ],
       "skipped": [{ "path": "...", "reason": "binary file" }],
       "errors": [{ "ruleId": "SW004", "path": "...", "message": "..." }]
     }
     ```
+  - `summary` also has `suppressed` and `baselined` counts, and `baselineStale` when a baseline was applied.
+- **Baseline (v0.1).** `scan --write-baseline <file>` records the current active findings; `scan --baseline <file>` moves
+  matching ones to `baselined` (no effect on the exit code). Format: `{"version": 1, "findings": [{ruleId, file, line,
+  fingerprint}]}`, sorted, no timestamps, no snippets (it must not copy secrets). The fingerprint is the first 16 hex of
+  sha256(ruleId, file, snippet with whitespace collapsed — the message when there is no snippet); the line is
+  informational. Each entry matches one finding, so a duplicate of a known line is new. Unmatched entries for files in
+  this scan are counted as stale. SARIF: `baselineState` `new`/`unchanged` on every unsuppressed result and an
+  `external` suppression on known ones. The baseline is only read when passed explicitly — never picked up from the
+  scanned folder — because a third-party repository could ship one. `--write-baseline` can't be combined with
+  `--files-from` or `--baseline`. The Action takes a `baseline` input.
 - **Exit codes:** a crashing rule doesn't stop the scan — it goes to `errors` and the exit code is `2` (incomplete
   result).
 
@@ -455,7 +468,7 @@ to do.
 - Order: scan → SARIF → upload to code scanning (`if: always()`) → fail the job if the exit code ≠ 0 and `fail-on` ≠
   `never`. A run error (exit 2) fails the job right away. The text report goes to the job summary (HTML-escaped: it
   quotes scanned content).
-- Outputs: `sarif-file`, `exit-code`, `findings` (active, excluding suppressed).
+- Outputs: `sarif-file`, `exit-code`, `findings` (active, excluding suppressed and baselined).
 - No separate repository for the Action: `uses: owner/skillward@<sha>`. This repository's CI runs its own Action with
   `version: local`.
 
@@ -524,6 +537,7 @@ paste-site command) are still redistributed in GitHub mirrors months after the r
 - [x] **Precision pass** over all rules against the public corpus; hand-labelled precision estimate.
 - [x] **Release workflow** with npm trusted publishing.
 - [x] **`explain`:** capability summary per target (the permissions-screen view).
+- [x] **Baseline:** `scan --write-baseline` / `--baseline`, Action input `baseline`.
 - [ ] **First npm release** (0.1.1).
 - [ ] **Responsible disclosure** of corpus findings; publish the report and launch.
 - [ ] **Corpus rerun** without the gaps above.

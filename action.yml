@@ -21,6 +21,9 @@ inputs:
   config:
     description: "Path to a skillward config file (default: skillward.config.json in the scanned directory)."
     default: ""
+  baseline:
+    description: "Path to a baseline file (from `skillward scan --write-baseline`): only findings not in it fail the job."
+    default: ""
   upload-sarif:
     description: "Upload results to GitHub code scanning (needs `security-events: write`)."
     default: "true"
@@ -95,6 +98,7 @@ runs:
         INPUT_VERSION: ${{ inputs.version }}
         INPUT_FAIL_ON: ${{ inputs.fail-on }}
         INPUT_CONFIG: ${{ inputs.config }}
+        INPUT_BASELINE: ${{ inputs.baseline }}
         SARIF_FILE: ${{ inputs.sarif-file }}
         FILES_FROM: ${{ steps.changed.outputs.files-from }}
         ACTION_PATH: ${{ github.action_path }}

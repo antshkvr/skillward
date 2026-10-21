@@ -19,6 +19,8 @@ export function jsonReport({ result, failOn }: ReportContext) {
       files: result.targets.reduce((n, t) => n + t.files.length, 0),
       findings: result.findings.length,
       suppressed: result.suppressed.length,
+      baselined: result.baseline?.findings.length ?? 0,
+      ...(result.baseline ? { baselineStale: result.baseline.stale } : {}),
       bySeverity,
       failOn,
       failed: exitCodeFor(result.findings, failOn) === 1,
@@ -26,6 +28,7 @@ export function jsonReport({ result, failOn }: ReportContext) {
     targets: result.targets,
     findings: result.findings,
     suppressed: result.suppressed,
+    baselined: result.baseline?.findings ?? [],
     skipped: result.skipped,
     errors: result.errors,
   };
