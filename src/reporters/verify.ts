@@ -1,6 +1,6 @@
 import { createColors } from "picocolors";
 import type { ScanResult } from "../engine/index.js";
-import { LOCK_FILE_NAME, type VerifyResult } from "../lock/index.js";
+import type { VerifyResult } from "../lock/index.js";
 import { escapeInvisible } from "../text.js";
 import type { Severity } from "../types.js";
 import { VERSION } from "../version.js";
@@ -23,12 +23,12 @@ export function verifyText({ verify, scan, failOn, color }: VerifyReportContext)
   const count = (s: string) => verify.changes.filter((ch) => ch.status === s).length;
 
   if (verify.changes.length === 0) {
-    out.push(c.green(`✔ Matches ${LOCK_FILE_NAME}.`));
+    out.push(c.green(`✔ Matches ${verify.lockName}.`));
     return out.join("\n") + "\n";
   }
 
   out.push(
-    `${LOCK_FILE_NAME}: ${count("changed")} changed, ${count("added")} added, ${count("removed")} removed file(s)` +
+    `${verify.lockName}: ${count("changed")} changed, ${count("added")} added, ${count("removed")} removed file(s)` +
       (verify.targetsAdded.length ? `; new target(s): ${verify.targetsAdded.map(escapeInvisible).join(", ")}` : "") +
       (verify.targetsRemoved.length ? `; removed target(s): ${verify.targetsRemoved.map(escapeInvisible).join(", ")}` : ""),
     "",
@@ -47,7 +47,7 @@ export function verifyText({ verify, scan, failOn, color }: VerifyReportContext)
   if (scan) {
     out.push(c.bold("Scan of added and changed files:"), textReporter({ result: scan, failOn, color }));
   }
-  out.push(c.dim(`Review the changes, then run \`skillward lock\` to accept them.`));
+  out.push(c.dim(`Review the changes, then run \`${verify.relock}\` to accept them.`));
   return out.join("\n") + "\n";
 }
 

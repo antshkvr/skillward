@@ -21,6 +21,8 @@ export const MAX_FINDINGS_PER_RULE_PER_FILE = 25;
 export interface ScanOptions {
   path: string;
   global?: boolean;
+  /** Only the global configuration, not the project at `path` (`verify --global`). */
+  globalOnly?: boolean;
   homeDir?: string;
   config: Config;
   rules?: Rule[];
@@ -64,6 +66,7 @@ export async function scan(options: ScanOptions): Promise<ScanResult> {
     path: options.path,
     ignore: options.config.ignore,
     global: options.global,
+    globalOnly: options.globalOnly,
     homeDir: options.homeDir,
     gitignore: options.gitignore,
   });

@@ -86,6 +86,8 @@ skillward explain [path]       # what each target lets the agent do (capability 
 
 skillward lock [path]          # create/update skillward.lock
 skillward verify [path]        # compare with the lockfile, show a diff
+skillward lock --global        # ~/.claude + MCP servers of ~/.claude.json → ~/.skillward/skillward.lock
+skillward verify --global
 skillward rules                # list rules with descriptions
 skillward sandbox <skill-path> # v0.2, see section 7
 ```
@@ -431,7 +433,17 @@ to do.
 - `verify` exit codes: `0` — matches the lock; `1` — any change (review it and lock again); `2` — no lockfile / error.
   Findings in the changed files are shown in the report; `--fail-on` only affects the report's verdict.
 - Diffs are capped at 200 lines per file; invisible characters are escaped.
-
+- **Secrets are masked in snapshots and diffs** with SW016's detectors plus JWTs and private key blocks (first 4
+  characters and the length). Snapshots are committed with the lock, so they must not copy secrets; both sides of a
+  diff are masked, and a change only inside a masked value is reported as "only masked secret values changed".
+- **`lock`/`verify --global`** pin the user's own configuration: what `scan --global` reads in `~/.claude` (with
+  hook scripts) and `~/.claude.json`, without walking a project. State lives in `~/.skillward/skillward.lock` and
+  `~/.skillward/snapshots/` — outside `~/.claude`, which is what is locked. `~/.claude.json` is rewritten constantly
+  (history, counters, per-project state), so only its MCP servers are locked: the `mcpServers` sections as canonical
+  JSON (keys sorted, projects without servers left out); that text is what is hashed, snapshotted and diffed.
+  `--global` refuses a path and reads no project config (an explicit `--config` applies to the scan of changes). Known
+  limit: the lock is on the same machine as what it pins, so it detects changes by updates and tools, not by an attacker
+  who can also rewrite `~/.skillward`.
 ## 9. Config
 
 `skillward.config.json`:
@@ -550,6 +562,7 @@ paste-site command) are still redistributed in GitHub mirrors months after the r
 - [x] **`explain`:** capability summary per target (the permissions-screen view).
 - [x] **Baseline:** `scan --write-baseline` / `--baseline`, Action input `baseline`.
 - [x] **`--untrusted`** for someone else's code; reports say what the config hides.
+- [x] **`lock`/`verify --global`** for `~/.claude` and the MCP servers in `~/.claude.json`; secrets masked in diffs and snapshots.
 - [ ] **First npm release** (0.1.1).
 - [ ] **Responsible disclosure** of corpus findings; publish the report and launch.
 - [ ] **Corpus rerun** without the gaps above.

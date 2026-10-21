@@ -12,6 +12,8 @@ export interface DiscoveryOptions {
   ignore?: string[];
   /** Also scan `~/.claude`. */
   global?: boolean;
+  /** Only the global configuration: `path` is the home directory and is not walked (`lock`/`verify --global`). */
+  globalOnly?: boolean;
   /** Overrides the home directory (tests). */
   homeDir?: string;
   /** Respect `.gitignore` files (default true). Off for `--untrusted`: the scanned folder's own files decide nothing. */
@@ -61,7 +63,9 @@ export async function discover(options: DiscoveryOptions): Promise<DiscoveryResu
   const skipped: SkippedFile[] = [];
   let root: string;
 
-  if (inputStat.isFile() || inputStat.isSymbolicLink()) {
+  if (options.globalOnly) {
+    root = input;
+  } else if (inputStat.isFile() || inputStat.isSymbolicLink()) {
     if (inputStat.isSymbolicLink()) throw new DiscoveryError(`refusing to follow symbolic link: ${options.path}`);
     root = dirname(input);
     if (basename(input) === "SKILL.md") {
@@ -80,7 +84,7 @@ export async function discover(options: DiscoveryOptions): Promise<DiscoveryResu
     throw new DiscoveryError(`not a file or directory: ${options.path}`);
   }
 
-  if (options.global) {
+  if (options.global || options.globalOnly) {
     const home = options.homeDir ?? homedir();
     // Avoid scanning the same files twice when the project root already contains ~/.claude.
     const seen = new Set(targets.flatMap((t) => t.files.map((f) => f.absPath)));
@@ -98,7 +102,7 @@ export async function discover(options: DiscoveryOptions): Promise<DiscoveryResu
     }
   }
 
-  await attachHookTargets(targets, root, options.global ? join(options.homeDir ?? homedir(), ".claude") : undefined, options.homeDir ?? homedir());
+  await attachHookTargets(targets, root, options.global || options.globalOnly ? join(options.homeDir ?? homedir(), ".claude") : undefined, options.homeDir ?? homedir());
 
   targets.sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0));
   return { root, targets, skipped };

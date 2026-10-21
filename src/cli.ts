@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { realpathSync } from "node:fs";
+import { homedir } from "node:os";
 import { readFile, stat, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -9,7 +10,7 @@ import { explain } from "./capabilities/index.js";
 import { CONFIG_FILE_NAME, ConfigError, DEFAULT_CONFIG, loadConfig, type Config } from "./config/index.js";
 import { DiscoveryError } from "./discovery/index.js";
 import { exitCodeFor, scan } from "./engine/index.js";
-import { lock, LOCK_FILE_NAME, LockError, verify } from "./lock/index.js";
+import { GLOBAL_STATE_DIR, lock, LOCK_FILE_NAME, LockError, verify } from "./lock/index.js";
 import { configNotes, type ConfigInfo } from "./reporters/config-note.js";
 import { explainJson, explainText } from "./reporters/explain.js";
 import { REPORTERS, type ReportFormat } from "./reporters/index.js";
@@ -123,17 +124,17 @@ export async function run(argv: string[], io: CliIO = defaultIO): Promise<number
   program
     .command("lock")
     .description(`create or update ${LOCK_FILE_NAME} with hashes of all agent instruction files`)
-    .argument("[path]", "project directory", ".")
+    .argument("[path]", "project directory (default: current directory)")
+    .option("--global", `lock ~/.claude and the MCP servers in ~/.claude.json instead, in ~/${GLOBAL_STATE_DIR}/${LOCK_FILE_NAME}`)
     .option("--config <file>", `config file (default: skillward.config.json in the project)`)
     .option("--no-snapshots", "do not keep copies of locked files in .skillward/snapshots (verify then can't show diffs)")
-    .action(async (path: string, flags: { config?: string; snapshots?: boolean }) => {
+    .action(async (path: string | undefined, flags: { config?: string; snapshots?: boolean; global?: boolean }) => {
       exitCode = await guard(io, async () => {
-        const root = await requireDirectory(path);
-        const { config } = await loadConfig({ configPath: flags.config, root });
-        const result = await lock({ root, config, snapshots: flags.snapshots, now: io.now });
+        const { root, config } = await lockScope(path, flags);
+        const result = await lock({ root, config, global: flags.global, homeDir: io.homeDir, snapshots: flags.snapshots, now: io.now });
         const files = result.lock.entries.reduce((n, e) => n + Object.keys(e.files).length, 0);
         io.stdout(
-          `Locked ${result.lock.entries.length} target(s), ${files} file(s) → ${LOCK_FILE_NAME}` +
+          `Locked ${result.lock.entries.length} target(s), ${files} file(s) → ${result.lockName}` +
             (result.updated.length ? ` (${result.updated.length} new or updated)` : " (no changes)") +
             "\n",
         );
@@ -145,9 +146,10 @@ export async function run(argv: string[], io: CliIO = defaultIO): Promise<number
     program
       .command("verify")
       .description(`compare agent instruction files with ${LOCK_FILE_NAME}, show the diff and scan what changed`)
-      .argument("[path]", "project directory", "."),
+      .argument("[path]", "project directory (default: current directory)")
+      .option("--global", `compare ~/.claude and the MCP servers in ~/.claude.json with ~/${GLOBAL_STATE_DIR}/${LOCK_FILE_NAME}`),
     ["text", "json"],
-  ).action(async (path: string, flags: CommonFlags) => {
+  ).action(async (path: string | undefined, flags: CommonFlags & { global?: boolean }) => {
     exitCode = await guard(io, () => runVerify(path, flags, io));
   });
 
@@ -254,15 +256,32 @@ async function runExplain(path: string, flags: ExplainFlags, io: CliIO): Promise
   return result.errors.length > 0 ? EXIT_ERROR : EXIT_OK;
 }
 
-async function runVerify(path: string, flags: CommonFlags, io: CliIO): Promise<number> {
-  const root = await requireDirectory(path);
-  const loaded = await loadConfig({ configPath: flags.config, root });
-  const config = withFlags(loaded.config, flags);
+/**
+ * Project or global scope for lock/verify. `--global` locks the user's own configuration, so it takes no path and
+ * reads no project config (only an explicit `--config`).
+ */
+async function lockScope(path: string | undefined, flags: { config?: string; global?: boolean }): Promise<{ root: string; config: Config }> {
+  if (flags.global) {
+    if (path !== undefined) throw new ConfigError("--global locks ~/.claude; don't pass a path with it");
+    const { config } = await loadConfig({ configPath: flags.config });
+    return { root: resolve("."), config };
+  }
+  const root = await requireDirectory(path ?? ".");
+  const { config } = await loadConfig({ configPath: flags.config, root });
+  return { root, config };
+}
+
+async function runVerify(path: string | undefined, flags: CommonFlags & { global?: boolean }, io: CliIO): Promise<number> {
+  const scope = await lockScope(path, flags);
+  const { root } = scope;
+  const config = withFlags(scope.config, flags);
   const failOn = flags.failOn ?? config.failOn ?? "high";
-  const result = await verify({ root, config });
+  const result = await verify({ root, config, global: flags.global, homeDir: io.homeDir });
 
   const touched = new Set(result.changes.flatMap((c) => (c.absPath ? [c.absPath] : [])));
-  const scanned = touched.size ? await scan({ path: root, config, onlyFiles: touched }) : undefined;
+  const home = io.homeDir ?? homedir();
+  const target = flags.global ? { path: home, globalOnly: true, homeDir: home } : { path: root };
+  const scanned = touched.size ? await scan({ ...target, config, onlyFiles: touched }) : undefined;
   const ctx = { verify: result, scan: scanned, failOn, color: useColor(flags, io) };
   await emit(flags.format === "json" ? verifyJson(ctx) : verifyText(ctx), flags, io);
 

@@ -170,3 +170,64 @@ function redactedSnippet(file: ParsedFile, start: number, end: number): string {
   const redacted = text.slice(0, from) + short + text.slice(to);
   return makeSnippet(redacted, from, from + short.length);
 }
+
+const JWT = /(?<![A-Za-z0-9_-])eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}/g;
+const KEY_BEGIN = /-----BEGIN [A-Z ]{0,40}PRIVATE KEY-----/g;
+const KEY_END = /-----END [A-Z ]{0,40}PRIVATE KEY-----/g;
+
+/** Private key blocks, BEGIN to END (or to the end of the text). One forward pass: linear even with many headers. */
+function privateKeySpans(text: string): Array<[number, number]> {
+  const spans: Array<[number, number]> = [];
+  let from = 0;
+  for (const begin of execAll(KEY_BEGIN, text)) {
+    if (begin.index < from) continue; // inside the previous block
+    KEY_END.lastIndex = begin.index + begin[0].length;
+    const end = KEY_END.exec(text);
+    KEY_END.lastIndex = 0;
+    from = end ? end.index + end[0].length : text.length;
+    spans.push([begin.index, from]);
+    if (!end) break;
+  }
+  return spans;
+}
+
+/**
+ * Masks credentials in arbitrary text, keeping the first 4 characters and the length (`ghp_…[40 chars]`). Used where
+ * skillward shows file content that isn't a finding: `verify` diffs and the snapshots they are made from. Errs on the
+ * side of masking: no placeholder or test-path exceptions for provider tokens.
+ */
+export function redactSecrets(text: string): string {
+  const spans: Array<[number, number]> = [];
+  for (const { re } of PROVIDER_TOKENS) {
+    for (const m of execAll(re, text)) spans.push([m.index, m.index + m[0].length]);
+  }
+  for (const re of ASSIGNMENTS) {
+    for (const m of execAll(re, text)) {
+      const value = m[2]!;
+      if (!looksRandom(value) || NOT_A_SECRET_NAME.test(m[1]!)) continue;
+      const start = m.index + m[0].lastIndexOf(value);
+      spans.push([start, start + value.length]);
+    }
+  }
+  for (const m of execAll(JWT, text)) spans.push([m.index, m.index + m[0].length]);
+  spans.push(...privateKeySpans(text));
+  if (!spans.length) return text;
+
+  // Overlapping matches (a token inside an assignment, a key inside a block) are masked as one.
+  spans.sort((a, b) => a[0] - b[0]);
+  const merged: Array<[number, number]> = [];
+  for (const [start, end] of spans) {
+    const last = merged.at(-1);
+    if (last && start < last[1]) last[1] = Math.max(last[1], end);
+    else merged.push([start, end]);
+  }
+  let out = "";
+  let pos = 0;
+  for (const [start, end] of merged) {
+    const value = text.slice(start, end);
+    const mask = value.startsWith("-----BEGIN") ? `-----BEGIN PRIVATE KEY-----…[${value.length} chars]` : `${value.slice(0, 4)}…[${value.length} chars]`;
+    out += text.slice(pos, start) + mask;
+    pos = end;
+  }
+  return out + text.slice(pos);
+}

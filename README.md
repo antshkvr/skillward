@@ -40,6 +40,8 @@ npx skillward explain path/to/their-repo --untrusted   # someone else's code: th
 
 npx skillward lock                 # pin current agent files in skillward.lock
 npx skillward verify               # diff against skillward.lock and scan what changed
+npx skillward lock --global        # pin your own ~/.claude and MCP servers (in ~/.skillward/)
+npx skillward verify --global      # did a plugin update or a tool change them since?
 npx skillward rules                # list rules
 ```
 
@@ -83,7 +85,7 @@ Capabilities: runs code from the internet · gives a remote host control · turn
 
 ### `lock [path]` and `verify [path]`
 
-`lock` writes `skillward.lock`: a sha256 of every file of every discovered target. It also keeps copies of the locked text files in `.skillward/snapshots/` (content-addressed), so `verify` can show a real diff. Commit both. `--no-snapshots` skips the copies; changes are still detected, just without a text diff.
+`lock` writes `skillward.lock`: a sha256 of every file of every discovered target. It also keeps copies of the locked text files in `.skillward/snapshots/` (content-addressed, secrets masked), so `verify` can show a real diff. Commit both. `--no-snapshots` skips the copies; changes are still detected, just without a text diff.
 
 ```json
 {
@@ -102,7 +104,11 @@ Capabilities: runs code from the internet · gives a remote host control · turn
 
 `source` is optional and maintained by hand; `lock` preserves it, and `lockedAt` only changes for entries whose files changed.
 
-`verify` lists added, removed and changed files with a diff, then scans **only the added and changed files**. Exit code `0` if everything matches the lock, `1` on any drift (review it, then run `lock` again), `2` if there is no lockfile. Options: `--format text|json`, `--output`, `--fail-on`, `--config`, `--no-inline-ignore`, `--no-color`.
+`verify` lists added, removed and changed files with a diff, then scans **only the added and changed files**. Exit code `0` if everything matches the lock, `1` on any drift (review it, then run `lock` again), `2` if there is no lockfile. Options: `--global`, `--format text|json`, `--output`, `--fail-on`, `--config`, `--no-inline-ignore`, `--no-color`.
+
+Diffs and snapshots never contain secrets: provider tokens, secret-looking values of secret-named keys, JWTs and private keys are masked to their first 4 characters and length (`ghp_…[40 chars]`), as in findings.
+
+**Your own configuration.** `lock --global` pins what applies to every project — `~/.claude` (`CLAUDE.md`, settings, skills, agents, commands, plugins, the scripts hooks run) and the MCP servers in `~/.claude.json` — in `~/.skillward/skillward.lock`, with snapshots in `~/.skillward/snapshots/`. `verify --global` then shows what changed since: a plugin that updated itself, an MCP server a tool added, an edited hook script. Of `~/.claude.json` only the `mcpServers` sections are locked, so history and counters don't count as drift. `--global` takes no path and reads no project config. The lock lives on the same machine as what it pins: it catches changes made by updates and tools, not by someone who can also rewrite `~/.skillward`.
 
 ## What gets scanned
 

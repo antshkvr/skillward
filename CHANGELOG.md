@@ -19,7 +19,8 @@ First public release.
 - Everything quoted from scanned files is escaped; snippets are truncated and secrets never printed in full.
 
 **Pinning and config**
-- `lock` / `verify`: `skillward.lock` with sha256 per file, snapshots for text diffs, scan of changed files only.
+- `lock` / `verify`: `skillward.lock` with sha256 per file, snapshots for text diffs, scan of changed files only. Secrets are masked in snapshots and diffs.
+- `lock --global` / `verify --global`: pin `~/.claude` and the MCP servers of `~/.claude.json` in `~/.skillward/`, and see what plugin updates or tools changed since.
 - `skillward.config.json`: `ignore`, `rules`, `failOn`, `inlineIgnore`.
 - Inline suppressions `skillward-ignore SWxxx: reason` (always reported separately), `--no-inline-ignore` to ignore them.
 - `--untrusted` (`scan`, `explain`) for someone else's code: the scanned folder's config, `skillward-ignore` comments and `.gitignore` files don't count. Reports always say what the config in use turns off or ignores (text line, JSON `config`).
