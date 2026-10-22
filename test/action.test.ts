@@ -9,7 +9,10 @@ const ROOT = join(import.meta.dirname, "..");
 const action = parse(readFileSync(join(ROOT, "action.yml"), "utf8")) as {
   inputs: Record<string, { default?: string }>;
   outputs: Record<string, { value: string }>;
-  runs: { using: string; steps: Array<{ name: string; uses?: string; run?: string; env?: Record<string, string> }> };
+  runs: {
+    using: string;
+    steps: Array<{ name: string; uses?: string; run?: string; env?: Record<string, string>; "continue-on-error"?: string }>;
+  };
 };
 const pkg = JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8")) as { version: string };
 
@@ -28,6 +31,15 @@ describe("action.yml", () => {
     const uses = action.runs.steps.flatMap((s) => (s.uses ? [s.uses] : []));
     expect(uses.length).toBeGreaterThan(0);
     for (const u of uses) expect(u, u).toMatch(/^[\w.-]+\/[\w./-]+@[0-9a-f]{40}$/);
+  });
+
+  it("tolerates a refused SARIF upload only on pull requests from forks", () => {
+    const upload = action.runs.steps.find((s) => s.uses?.startsWith("github/codeql-action/upload-sarif@"));
+    expect(upload!["continue-on-error"]).toBe(
+      "${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}",
+    );
+    const gate = action.runs.steps.findIndex((s) => s.name === "Fail on findings");
+    expect(gate).toBeGreaterThan(action.runs.steps.indexOf(upload!));
   });
 
   it("never interpolates expressions into shell scripts (inputs go through env)", () => {

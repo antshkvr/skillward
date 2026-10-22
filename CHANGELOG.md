@@ -27,7 +27,7 @@ First public release.
 - Baseline: `scan --write-baseline <file>` records current findings, `scan --baseline <file>` fails only on new ones (matched by rule, file and text, not line; hashes only, no snippets). Action input `baseline`.
 
 **CI**
-- GitHub Action (`action.yml`): scan, SARIF upload to code scanning, job summary; on pull requests only changed files are reported (`scan --files-from`).
+- GitHub Action (`action.yml`): scan, SARIF upload to code scanning, job summary; on pull requests only changed files are reported (`scan --files-from`). On pull requests from forks a refused code scanning upload doesn't fail the job.
 - Release workflow: a `vX.Y.Z` tag publishes to npm with provenance via trusted publishing.
 - Antivirus-safe build: PowerShell download-and-execute vocabulary lives in `rules/data/vocabulary.json`, not in shipped JavaScript, so Windows Defender's ML heuristic doesn't quarantine the package.
 

@@ -13,6 +13,44 @@ Skills and instruction files aren't documentation: they are commands an agent ex
 
 It flags hidden text, remote code execution, credential access, permission bypasses, persistence and concealment before an agent ever reads them. Antivirus looks for known malicious *code*; skillward looks at the *instructions*. In our scan of ~2,900 public repositories (October 2026), Windows Defender quarantined 4 files from the ClawHavoc skill-malware campaign — the ones that carried their payload inline. It left 160 more copies in place, whose instructions only point at the payload (a password-protected download, a paste-site command); skillward flags those. Its checks for these two shapes were written after studying the campaign.
 
+## Quick start
+
+Requires Node.js 22.12+.
+
+**Before you open someone else's repository or install a skill**, see what it would let the agent do:
+
+```sh
+npx skillward explain path/to/their-repo --untrusted
+```
+
+`--untrusted` makes sure the repository's own `skillward.config.json`, `skillward-ignore` comments and `.gitignore` can't hide anything. Run it before you start an agent there: once a session starts, the agent has already read the repository's `CLAUDE.md`.
+
+**Pin your own setup** — `~/.claude` and the MCP servers in `~/.claude.json` — and get told when it changes:
+
+```sh
+npm install -g skillward
+skillward lock --global
+```
+
+Then add a `SessionStart` hook to `~/.claude/settings.json`, so Claude Code checks it every time it starts:
+
+```json
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup",
+        "hooks": [{ "type": "command", "command": "skillward verify --global --no-color >&2 || exit 2" }]
+      }
+    ]
+  }
+}
+```
+
+and run `skillward lock --global` once more, since you just changed a locked file. When nothing changed, the session starts as usual. When a plugin updated itself, a tool added an MCP server or a hook script was edited, you see the diff and the findings in it before your first prompt. Everything goes to stderr on purpose: Claude Code adds a `SessionStart` hook's stdout to the agent's context, and the report quotes exactly the text you haven't reviewed yet; exit code `2` shows stderr to you and not to the agent. Review the change, then `skillward lock --global`.
+
+**In CI**, use the [GitHub Action](#github-action), or `npx skillward scan --fail-on high`.
+
 ## Safety guarantees
 
 - The scanner **never executes, imports or loads** scanned content, and makes **no network requests**.
@@ -24,8 +62,6 @@ It flags hidden text, remote code execution, credential access, permission bypas
 Found a security bug in skillward itself? Please report it privately — see [SECURITY.md](SECURITY.md).
 
 ## Usage
-
-Requires Node.js 22.12+.
 
 ```sh
 npx skillward scan                 # current directory
@@ -108,7 +144,7 @@ Capabilities: runs code from the internet · gives a remote host control · turn
 
 Diffs and snapshots never contain secrets: provider tokens, secret-looking values of secret-named keys, JWTs and private keys are masked to their first 4 characters and length (`ghp_…[40 chars]`), as in findings.
 
-**Your own configuration.** `lock --global` pins what applies to every project — `~/.claude` (`CLAUDE.md`, settings, skills, agents, commands, plugins, the scripts hooks run) and the MCP servers in `~/.claude.json` — in `~/.skillward/skillward.lock`, with snapshots in `~/.skillward/snapshots/`. `verify --global` then shows what changed since: a plugin that updated itself, an MCP server a tool added, an edited hook script. Of `~/.claude.json` only the `mcpServers` sections are locked, so history and counters don't count as drift. `--global` takes no path and reads no project config. The lock lives on the same machine as what it pins: it catches changes made by updates and tools, not by someone who can also rewrite `~/.skillward`.
+**Your own configuration.** `lock --global` pins what applies to every project — `~/.claude` (`CLAUDE.md`, settings, skills, agents, commands, plugins, the scripts hooks run) and the MCP servers in `~/.claude.json` — in `~/.skillward/skillward.lock`, with snapshots in `~/.skillward/snapshots/`. `verify --global` then shows what changed since: a plugin that updated itself, an MCP server a tool added, an edited hook script. Of `~/.claude.json` only the `mcpServers` sections are locked, so history and counters don't count as drift. `--global` takes no path and reads no project config. The lock lives on the same machine as what it pins: it catches changes made by updates and tools, not by someone who can also rewrite `~/.skillward`. To run it on every Claude Code start, see the `SessionStart` hook in [Quick start](#quick-start).
 
 ## What gets scanned
 
@@ -296,12 +332,29 @@ On `pull_request` events only the files the PR adds or modifies are reported (`o
 | `only-changed` | `auto` | `auto` (pull requests), `true`, `false` |
 | `config` | | Config file path |
 | `baseline` | | Baseline file path: only findings not in it fail the job |
-| `upload-sarif` | `true` | Upload to code scanning. Private repositories need GitHub Advanced Security — set `false` otherwise |
+| `upload-sarif` | `true` | Upload to code scanning. Private repositories need GitHub Advanced Security — set `false` otherwise. See forks below |
 | `sarif-file` | `skillward.sarif` | Where to write the report |
 | `category` | `skillward` | Code scanning category |
 | `node-version` | `22` | Node.js for the run |
 
 Outputs: `sarif-file`, `exit-code`, `findings` (active findings count: not suppressed, not in the baseline). The job fails after the upload, so alerts are visible even when it fails. Pin the action by commit SHA, like any third-party action.
+
+**Pull requests from forks** run with a read-only token, and GitHub may refuse the code scanning upload. The action doesn't let a refused upload fail the job on a fork PR: the report is still in the job summary, and `fail-on` still gates. To skip the upload on fork PRs altogether:
+
+```yaml
+        with:
+          upload-sarif: ${{ github.event.pull_request.head.repo.full_name == github.repository || github.event_name != 'pull_request' }}
+```
+
+Don't switch to `pull_request_target` to get a writable token: it would run with the base repository's permissions on code from the fork.
+
+## How it compares
+
+[Snyk Agent Scan](https://github.com/snyk/agent-scan) (formerly `mcp-scan` by Invariant Labs) connects to your MCP servers — it starts stdio servers by running the commands in their configs — and sends tool descriptions, MCP configs and skill content to Snyk's API for analysis; it needs a Snyk API token. That lets it see what a server actually serves at run time, which skillward can't.
+
+skillward reads files and nothing else: it never starts a server or runs a command, makes no network requests and needs no account, so it is safe to point at a repository you haven't decided to trust. It also covers what steers the agent besides MCP servers and skills — `CLAUDE.md` / `AGENTS.md`, hooks and the scripts they run, settings, other agents' rule files — and pins all of it with `lock` / `verify`.
+
+They answer different questions and work well together: skillward before you trust a repository or a config, a run-time scanner (in a sandbox, for untrusted servers) once you do. (Based on Snyk Agent Scan's README, October 2026.)
 
 ## Development
 

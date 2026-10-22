@@ -489,7 +489,8 @@ to do.
   files aren't scanned. If the list can't be built, a warning and a full scan. `pull_request_target` is deliberately
   not supported.
 - Order: scan → SARIF → upload to code scanning (`if: always()`) → fail the job if the exit code ≠ 0 and `fail-on` ≠
-  `never`. A run error (exit 2) fails the job right away. The text report goes to the job summary (HTML-escaped: it
+  `never`. On a pull request from a fork (read-only token) the upload step has `continue-on-error`: GitHub may refuse
+  the upload, and that must not fail the job — the gate and the job summary don't depend on it (tested). A run error (exit 2) fails the job right away. The text report goes to the job summary (HTML-escaped: it
   quotes scanned content).
 - Outputs: `sarif-file`, `exit-code`, `findings` (active, excluding suppressed and baselined).
 - No separate repository for the Action: `uses: owner/skillward@<sha>`. This repository's CI runs its own Action with
