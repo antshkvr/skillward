@@ -4,6 +4,7 @@ import type { VerifyResult } from "../lock/index.js";
 import { escapeInvisible } from "../text.js";
 import type { Severity } from "../types.js";
 import { VERSION } from "../version.js";
+import { configJson, configNotes, type ConfigInfo } from "./config-note.js";
 import { jsonReport } from "./json.js";
 import { textReporter } from "./text.js";
 
@@ -13,17 +14,21 @@ export interface VerifyReportContext {
   scan?: ScanResult;
   failOn: Severity;
   color: boolean;
+  /** The config that decided what is locked; reports say what it leaves out. */
+  config?: ConfigInfo;
+  root?: string;
 }
 
 export const VERIFY_REPORT_VERSION = 1;
 
-export function verifyText({ verify, scan, failOn, color }: VerifyReportContext): string {
+export function verifyText({ verify, scan, failOn, color, config, root }: VerifyReportContext): string {
   const c = createColors(color);
   const out: string[] = [];
+  const notes = root ? configNotes(config, root, color) : [];
   const count = (s: string) => verify.changes.filter((ch) => ch.status === s).length;
 
   if (verify.changes.length === 0) {
-    out.push(c.green(`✔ Matches ${verify.lockName}.`));
+    out.push(c.green(`✔ Matches ${verify.lockName}.`), ...notes);
     return out.join("\n") + "\n";
   }
 
@@ -47,15 +52,16 @@ export function verifyText({ verify, scan, failOn, color }: VerifyReportContext)
   if (scan) {
     out.push(c.bold("Scan of added and changed files:"), textReporter({ result: scan, failOn, color }));
   }
-  out.push(c.dim(`Review the changes, then run \`${verify.relock}\` to accept them.`));
+  out.push(...notes, c.dim(`Review the changes, then run \`${verify.relock}\` to accept them.`));
   return out.join("\n") + "\n";
 }
 
-export function verifyJson({ verify, scan, failOn }: VerifyReportContext): string {
+export function verifyJson({ verify, scan, failOn, config }: VerifyReportContext): string {
   const report = {
     version: VERIFY_REPORT_VERSION,
     tool: { name: "skillward", version: VERSION },
     lockfile: verify.lockPath,
+    config: configJson(config) ?? null,
     clean: verify.changes.length === 0,
     targets: { added: verify.targetsAdded, removed: verify.targetsRemoved },
     // Absolute paths stay internal; the report uses display paths.

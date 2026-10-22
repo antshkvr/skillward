@@ -121,7 +121,7 @@ Capabilities: runs code from the internet · gives a remote host control · turn
 
 ### `lock [path]` and `verify [path]`
 
-`lock` writes `skillward.lock`: a sha256 of every file of every discovered target. It also keeps copies of the locked text files in `.skillward/snapshots/` (content-addressed, secrets masked), so `verify` can show a real diff. Commit both. `--no-snapshots` skips the copies; changes are still detected, just without a text diff.
+`lock` writes `skillward.lock`: a sha256 of every file of every discovered target. It also keeps copies of the locked text files in `.skillward/snapshots/` (content-addressed, secrets masked), so `verify` can show a real diff. Commit both. `--no-snapshots` skips the copies; changes are still detected, just without a text diff. The project's `skillward.config.json` decides what is locked: paths in its `ignore` are left out, and `lock` and `verify` say so.
 
 ```json
 {
@@ -291,7 +291,7 @@ A config can hide findings, so the text report always says what the one in use t
 }
 ```
 
-Columns are 1-based, in UTF-16 code units. Suppressed findings carry a `suppression: { ruleIds, reason, line }` object. `verify --format json` wraps this report: `{ "version": 1, "clean", "changes": [...], "targets": { "added", "removed" }, "scan": <report or null> }`.
+Columns are 1-based, in UTF-16 code units. Suppressed findings carry a `suppression: { ruleIds, reason, line }` object. `verify --format json` wraps this report: `{ "version": 1, "clean", "config", "changes": [...], "targets": { "added", "removed" }, "scan": <report or null> }`.
 
 ### SARIF
 

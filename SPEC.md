@@ -467,7 +467,8 @@ to do.
   outside agent directories) are the same kind of lever. So:
   - Reports always say what the applied config hides: a text line `Config <path>: turns off …; sets severity …;
     ignores …` (with a hint to use `--untrusted` when the config came from the scanned folder), and a `config`
-    section in the JSON of `scan` and `explain`. In the Action, this line lands in the job summary, so a pull request
+    section in the JSON of `scan`, `explain` and `verify`. `lock` and `verify` print the line too: a config's `ignore`
+    decides what is locked at all, so a skill left out of the lock must not look like a verified one. In the Action, this line lands in the job summary, so a pull request
     that edits the config to hide its own finding is visible.
   - `scan`/`explain --untrusted`: the scanned folder's `skillward.config.json` isn't read (the report says it was
     skipped), inline suppressions are off, `.gitignore` files are not respected. An explicit `--config` is the user's

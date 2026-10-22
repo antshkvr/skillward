@@ -128,15 +128,19 @@ export async function run(argv: string[], io: CliIO = defaultIO): Promise<number
     .option("--global", `lock ~/.claude and the MCP servers in ~/.claude.json instead, in ~/${GLOBAL_STATE_DIR}/${LOCK_FILE_NAME}`)
     .option("--config <file>", `config file (default: skillward.config.json in the project)`)
     .option("--no-snapshots", "do not keep copies of locked files in .skillward/snapshots (verify then can't show diffs)")
-    .action(async (path: string | undefined, flags: { config?: string; snapshots?: boolean; global?: boolean }) => {
+    .option("--no-color", "disable colors")
+    .action(async (path: string | undefined, flags: { config?: string; snapshots?: boolean; global?: boolean; color?: boolean }) => {
       exitCode = await guard(io, async () => {
-        const { root, config } = await lockScope(path, flags);
-        const result = await lock({ root, config, global: flags.global, homeDir: io.homeDir, snapshots: flags.snapshots, now: io.now });
+        const { root, info } = await lockScope(path, flags);
+        const result = await lock({ root, config: info.config, global: flags.global, homeDir: io.homeDir, snapshots: flags.snapshots, now: io.now });
         const files = result.lock.entries.reduce((n, e) => n + Object.keys(e.files).length, 0);
+        const color = useColor({ ...flags, format: "text" }, io);
         io.stdout(
-          `Locked ${result.lock.entries.length} target(s), ${files} file(s) → ${result.lockName}` +
-            (result.updated.length ? ` (${result.updated.length} new or updated)` : " (no changes)") +
-            "\n",
+          [
+            `Locked ${result.lock.entries.length} target(s), ${files} file(s) → ${result.lockName}` +
+              (result.updated.length ? ` (${result.updated.length} new or updated)` : " (no changes)"),
+            ...configNotes(info, root, color),
+          ].join("\n") + "\n",
         );
         return EXIT_OK;
       });
@@ -258,23 +262,20 @@ async function runExplain(path: string, flags: ExplainFlags, io: CliIO): Promise
 
 /**
  * Project or global scope for lock/verify. `--global` locks the user's own configuration, so it takes no path and
- * reads no project config (only an explicit `--config`).
+ * reads no project config (only an explicit `--config`). A project config's `ignore` decides what is locked at all, so
+ * lock and verify say what it changes, like scan does.
  */
-async function lockScope(path: string | undefined, flags: { config?: string; global?: boolean }): Promise<{ root: string; config: Config }> {
-  if (flags.global) {
-    if (path !== undefined) throw new ConfigError("--global locks ~/.claude; don't pass a path with it");
-    const { config } = await loadConfig({ configPath: flags.config });
-    return { root: resolve("."), config };
-  }
-  const root = await requireDirectory(path ?? ".");
-  const { config } = await loadConfig({ configPath: flags.config, root });
-  return { root, config };
+async function lockScope(path: string | undefined, flags: { config?: string; global?: boolean }): Promise<{ root: string; info: ConfigInfo }> {
+  if (path !== undefined && flags.global) throw new ConfigError("--global locks ~/.claude; don't pass a path with it");
+  const root = flags.global ? resolve(".") : await requireDirectory(path ?? ".");
+  const loaded = await loadConfig({ configPath: flags.config, ...(flags.global ? {} : { root }) });
+  return { root, info: { config: loaded.config, untrusted: false, ...(loaded.path ? { path: loaded.path } : {}) } };
 }
 
 async function runVerify(path: string | undefined, flags: CommonFlags & { global?: boolean }, io: CliIO): Promise<number> {
   const scope = await lockScope(path, flags);
   const { root } = scope;
-  const config = withFlags(scope.config, flags);
+  const config = withFlags(scope.info.config, flags);
   const failOn = flags.failOn ?? config.failOn ?? "high";
   const result = await verify({ root, config, global: flags.global, homeDir: io.homeDir });
 
@@ -282,7 +283,7 @@ async function runVerify(path: string | undefined, flags: CommonFlags & { global
   const home = io.homeDir ?? homedir();
   const target = flags.global ? { path: home, globalOnly: true, homeDir: home } : { path: root };
   const scanned = touched.size ? await scan({ ...target, config, onlyFiles: touched }) : undefined;
-  const ctx = { verify: result, scan: scanned, failOn, color: useColor(flags, io) };
+  const ctx = { verify: result, scan: scanned, failOn, color: useColor(flags, io), config: { ...scope.info, config }, root };
   await emit(flags.format === "json" ? verifyJson(ctx) : verifyText(ctx), flags, io);
 
   if (scanned && scanned.errors.length > 0) return EXIT_ERROR;

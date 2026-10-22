@@ -23,7 +23,7 @@ First public release.
 - `lock --global` / `verify --global`: pin `~/.claude` and the MCP servers of `~/.claude.json` in `~/.skillward/`, and see what plugin updates or tools changed since.
 - `skillward.config.json`: `ignore`, `rules`, `failOn`, `inlineIgnore`.
 - Inline suppressions `skillward-ignore SWxxx: reason` (always reported separately), `--no-inline-ignore` to ignore them.
-- `--untrusted` (`scan`, `explain`) for someone else's code: the scanned folder's config, `skillward-ignore` comments and `.gitignore` files don't count. Reports always say what the config in use turns off or ignores (text line, JSON `config`).
+- `--untrusted` (`scan`, `explain`) for someone else's code: the scanned folder's config, `skillward-ignore` comments and `.gitignore` files don't count. Reports always say what the config in use turns off or ignores (text line, JSON `config`), including `lock` and `verify`.
 - Baseline: `scan --write-baseline <file>` records current findings, `scan --baseline <file>` fails only on new ones (matched by rule, file and text, not line; hashes only, no snippets). Action input `baseline`.
 
 **CI**

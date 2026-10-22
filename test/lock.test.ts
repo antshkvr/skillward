@@ -170,6 +170,22 @@ describe("lock/verify CLI", () => {
     expect(json.changes[0].absPath).toBeUndefined();
   });
 
+  it("says what the project's config leaves out of the lock", async () => {
+    const root = base();
+    write(root, "skillward.config.json", JSON.stringify({ ignore: [".claude/**"] }));
+    const locked = await cli(["lock", root, "--no-color"]);
+    expect(locked.code).toBe(0);
+    expect(locked.stdout).toContain("Config skillward.config.json: ignores .claude/**.");
+    expect(locked.stdout).not.toContain("--untrusted");
+
+    expect((await cli(["verify", root])).stdout).toBe("✔ Matches skillward.lock.\nConfig skillward.config.json: ignores .claude/**.\n");
+    write(root, "CLAUDE.md", "# Rules\nchanged\n");
+    const drift = await cli(["verify", root]);
+    expect(drift.stdout.match(/Config skillward\.config\.json/g)).toHaveLength(1);
+    const json = JSON.parse((await cli(["verify", root, "--format", "json"])).stdout);
+    expect(json.config).toMatchObject({ path: join(root, "skillward.config.json"), ignore: [".claude/**"] });
+  });
+
   it("exits 2 when verify has no lockfile or the path is not a directory", async () => {
     expect((await cli(["verify", project({})])).code).toBe(2);
     const root = base();
