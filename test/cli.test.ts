@@ -123,6 +123,22 @@ describe("cli", () => {
     expect(stdout).toMatch(/SW005\s+secret-path-access/);
   });
 
+  it("wraps text reports to the terminal width, and only in a terminal", async () => {
+    const run80 = async (extra: string[]) => {
+      let stdout = "";
+      const io: CliIO = { stdout: (t) => (stdout += t), stderr: () => {}, isTTY: true, columns: 80, env: { NO_COLOR: "1" } };
+      await run(["scan", dangerous, ...extra], io);
+      return stdout;
+    };
+    const findingLines = (text: string) => text.split("\n").filter((l) => l.startsWith("  ") && !l.includes("│"));
+    const tty = findingLines(await run80([]));
+    expect(tty.length).toBeGreaterThan(1);
+    expect(tty.every((l) => l.length < 80)).toBe(true);
+    const out = join(mkdtempSync(join(tmpdir(), "skillward-out-")), "report.txt");
+    await run80(["--output", out]);
+    expect(findingLines(readFileSync(out, "utf8"))).toHaveLength(1);
+  });
+
   it("prints help and version with exit code 0", async () => {
     expect((await cli(["--help"])).code).toBe(0);
     const version = await cli(["--version"]);

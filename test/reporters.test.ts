@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { ScanResult } from "../src/engine/index.js";
 import { REPORTERS } from "../src/reporters/index.js";
 import { JSON_REPORT_VERSION } from "../src/reporters/json.js";
+import { wrapWords } from "../src/reporters/text.js";
 import { VERSION } from "../src/version.js";
 
 const result: ScanResult = {
@@ -95,6 +96,25 @@ describe("text reporter", () => {
     const out = REPORTERS.text({ result: { ...result, suppressed }, failOn: "high", color: false });
     expect(out).toContain("1 finding(s) suppressed by inline skillward-ignore:");
     expect(out).toContain("CLAUDE.md:3  SW004 high  (attack example; directive on line 2)");
+  });
+
+  it("wraps long messages at spaces under the message when given a terminal width", () => {
+    const message = "Executes code fetched from the network (remote download piped into a shell). It runs unreviewed, with your permissions.";
+    const long = { ...result, findings: [{ ...result.findings[0]!, message, confidence: "medium" as const }], skipped: [] };
+    const wrapped = REPORTERS.text({ result: long, failOn: "high", color: false, width: 80 });
+    const lines = wrapped.split("\n").filter((l) => l.startsWith("  ") && !l.includes("│"));
+    expect(lines.length).toBeGreaterThan(1);
+    for (const l of lines) expect(l.length).toBeLessThan(80);
+    expect(lines[0]).toMatch(/^ {2}3:5 {5}high {3}SW004 {2}Executes code/);
+    for (const l of lines.slice(1)) expect(l).toMatch(/^ {24}\S/);
+    expect(lines.map((l) => l.trim()).join(" ")).toContain(`${message.split(" ").slice(-3).join(" ")} (confidence: medium)`);
+    // Without a width (a file, a pipe, CI) the message stays on one line.
+    expect(REPORTERS.text({ result: long, failOn: "high", color: false })).toContain(`SW004  ${message} (confidence: medium)\n`);
+  });
+
+  it("wrapWords keeps words whole", () => {
+    expect(wrapWords("aa bb cc dd", 5)).toEqual(["aa bb", "cc dd"]);
+    expect(wrapWords("a https://example.invalid/very/long b", 10)).toEqual(["a", "https://example.invalid/very/long", "b"]);
   });
 
   it("uses colors only when asked", () => {

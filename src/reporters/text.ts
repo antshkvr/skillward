@@ -5,7 +5,23 @@ import { configNotes } from "./config-note.js";
 import { SEVERITIES, type Finding, type Severity } from "../types.js";
 import type { Reporter } from "./types.js";
 
-export const textReporter: Reporter = ({ result, failOn, color, config }) => {
+/** Splits `text` at spaces into lines of at most `width` characters; a longer word gets a line of its own. */
+export function wrapWords(text: string, width: number): string[] {
+  const lines: string[] = [];
+  let line = "";
+  for (const word of text.split(" ")) {
+    if (line && line.length + 1 + word.length > width) {
+      lines.push(line);
+      line = word;
+    } else {
+      line = line ? `${line} ${word}` : word;
+    }
+  }
+  lines.push(line);
+  return lines;
+}
+
+export const textReporter: Reporter = ({ result, failOn, color, config, width }) => {
   const c = createColors(color);
   const paint: Record<Severity, (s: string) => string> = {
     high: (s) => c.bold(c.red(s)),
@@ -28,8 +44,20 @@ export const textReporter: Reporter = ({ result, failOn, color, config }) => {
       const pos = `${f.line}:${f.column ?? 1}`.padEnd(8);
       const sev = paint[f.severity](f.severity.padEnd(6));
       const rule = c.dim(`${f.ruleId}`);
-      const conf = f.confidence === "high" ? "" : c.dim(` (confidence: ${f.confidence})`);
-      out.push(`  ${pos}${sev} ${rule}  ${escapeInvisible(f.message)}${conf}`);
+      const conf = f.confidence === "high" ? "" : ` (confidence: ${f.confidence})`;
+      const message = escapeInvisible(f.message);
+      const indent = 2 + pos.length + 7 + f.ruleId.length + 2;
+      // In a terminal, wrap at spaces under the message instead of letting the terminal cut words in half.
+      const room = width ? width - 1 - indent : 0;
+      if (room >= 40 && message.length + conf.length > room) {
+        const lines = wrapWords(message, room);
+        const last = lines.length - 1;
+        if (conf && lines[last]!.length + conf.length <= room) lines[last] += c.dim(conf);
+        else if (conf) lines.push(c.dim(conf.trimStart()));
+        out.push(`  ${pos}${sev} ${rule}  ${lines[0]}`, ...lines.slice(1).map((l) => " ".repeat(indent) + l));
+      } else {
+        out.push(`  ${pos}${sev} ${rule}  ${message}${conf && c.dim(conf)}`);
+      }
       if (f.snippet) out.push(`  ${" ".repeat(8)}${c.dim("│ " + f.snippet)}`);
     }
     out.push("");

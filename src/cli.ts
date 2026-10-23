@@ -24,6 +24,8 @@ export interface CliIO {
   stderr: (text: string) => void;
   /** Whether stdout is a terminal (enables colors). */
   isTTY: boolean;
+  /** Terminal width, when stdout is a terminal (text reports wrap to it). */
+  columns?: number;
   env: Record<string, string | undefined>;
   /** Overrides the home directory used by `--global` (tests). */
   homeDir?: string;
@@ -35,6 +37,7 @@ const defaultIO: CliIO = {
   stdout: (t) => process.stdout.write(t),
   stderr: (t) => process.stderr.write(t),
   isTTY: Boolean(process.stdout.isTTY),
+  columns: process.stdout.isTTY ? process.stdout.columns : undefined,
   env: process.env,
 };
 
@@ -239,7 +242,7 @@ async function runScan(path: string, flags: ScanFlags, io: CliIO): Promise<numbe
   const baseline = flags.baseline ? await readBaseline(flags.baseline) : undefined;
   const result = await scan({ path, global: flags.global, homeDir: io.homeDir, config, onlyFiles, baseline, gitignore });
 
-  const report = REPORTERS[flags.format]({ result, failOn, color: useColor(flags, io), config: info });
+  const report = REPORTERS[flags.format]({ result, failOn, color: useColor(flags, io), width: termWidth(flags, io), config: info });
   await emit(report, flags, io);
   if (result.errors.length > 0) return EXIT_ERROR;
   return exitCodeFor(result.findings, failOn);
@@ -283,7 +286,7 @@ async function runVerify(path: string | undefined, flags: CommonFlags & { global
   const home = io.homeDir ?? homedir();
   const target = flags.global ? { path: home, globalOnly: true, homeDir: home } : { path: root };
   const scanned = touched.size ? await scan({ ...target, config, onlyFiles: touched }) : undefined;
-  const ctx = { verify: result, scan: scanned, failOn, color: useColor(flags, io), config: { ...scope.info, config }, root };
+  const ctx = { verify: result, scan: scanned, failOn, color: useColor(flags, io), width: termWidth(flags, io), config: { ...scope.info, config }, root };
   await emit(flags.format === "json" ? verifyJson(ctx) : verifyText(ctx), flags, io);
 
   if (scanned && scanned.errors.length > 0) return EXIT_ERROR;
@@ -293,6 +296,11 @@ async function runVerify(path: string | undefined, flags: CommonFlags & { global
 
 function useColor(flags: CommonFlags, io: CliIO): boolean {
   return flags.color !== false && !flags.output && io.isTTY && !io.env.NO_COLOR && flags.format === "text";
+}
+
+/** The width text reports wrap to: only when printing text to a terminal. */
+function termWidth(flags: CommonFlags, io: CliIO): number | undefined {
+  return !flags.output && io.isTTY && flags.format === "text" ? io.columns : undefined;
 }
 
 async function emit(report: string, flags: CommonFlags, io: CliIO): Promise<void> {

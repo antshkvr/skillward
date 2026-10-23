@@ -4,6 +4,8 @@ Static scanner for AI agent instruction files — `SKILL.md` skills, `CLAUDE.md`
 
 **skillward shows what you agree to when you give an agent a skill, an MCP server or someone else's repository — and makes sure it doesn't change behind your back.**
 
+![skillward explains what a downloaded skill can do, pins it with lock, and verify catches an update that hides an instruction to send AWS and SSH keys](docs/demo.gif)
+
 Skills and instruction files aren't documentation: they are commands an agent executes with your permissions. Think of skillward as the permissions screen before you install an app, not an antivirus:
 
 - **It decides nothing for you.** Every finding is a file, a line and a reason; you (or CI, via `--fail-on`) decide.
@@ -269,7 +271,7 @@ A config can hide findings, so the text report always says what the one in use t
 ```json
 {
   "version": 1,
-  "tool": { "name": "skillward", "version": "0.1.2" },
+  "tool": { "name": "skillward", "version": "0.1.3" },
   "root": "/abs/path/to/project",
   "config": { "path": null, "untrusted": false, "rules": {}, "ignore": [], "inlineIgnore": true },
   "summary": {
@@ -317,7 +319,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: antshkvr/skillward@<commit-sha> # v0.1.2 — pin the SHA of the v0.1.2 tag
+      - uses: antshkvr/skillward@<commit-sha> # v0.1.3 — pin the SHA of the v0.1.3 tag
         with:
           fail-on: high
 ```
@@ -327,7 +329,7 @@ On `pull_request` events only the files the PR adds or modifies are reported (`o
 | Input | Default | |
 |---|---|---|
 | `path` | `.` | Directory to scan |
-| `version` | `0.1.2` | Exact skillward version from npm, or `local` to build from the action checkout. Ranges and `latest` are refused. |
+| `version` | `0.1.3` | Exact skillward version from npm, or `local` to build from the action checkout. Ranges and `latest` are refused. |
 | `fail-on` | `high` | `info`, `low`, `medium`, `high`, or `never` (report only) |
 | `only-changed` | `auto` | `auto` (pull requests), `true`, `false` |
 | `config` | | Config file path |

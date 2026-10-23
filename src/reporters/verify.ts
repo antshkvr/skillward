@@ -14,6 +14,8 @@ export interface VerifyReportContext {
   scan?: ScanResult;
   failOn: Severity;
   color: boolean;
+  /** Terminal width for the scan part (see ReportContext). */
+  width?: number;
   /** The config that decided what is locked; reports say what it leaves out. */
   config?: ConfigInfo;
   root?: string;
@@ -21,7 +23,7 @@ export interface VerifyReportContext {
 
 export const VERIFY_REPORT_VERSION = 1;
 
-export function verifyText({ verify, scan, failOn, color, config, root }: VerifyReportContext): string {
+export function verifyText({ verify, scan, failOn, color, width, config, root }: VerifyReportContext): string {
   const c = createColors(color);
   const out: string[] = [];
   const notes = root ? configNotes(config, root, color) : [];
@@ -50,7 +52,7 @@ export function verifyText({ verify, scan, failOn, color, config, root }: Verify
   }
   out.push("");
   if (scan) {
-    out.push(c.bold("Scan of added and changed files:"), textReporter({ result: scan, failOn, color }));
+    out.push(c.bold("Scan of added and changed files:"), textReporter({ result: scan, failOn, color, width }));
   }
   out.push(...notes, c.dim(`Review the changes, then run \`${verify.relock}\` to accept them.`));
   return out.join("\n") + "\n";

@@ -7,6 +7,8 @@ export interface ReportContext {
   failOn: Severity;
   /** Enable ANSI colors (text reporter only). */
   color: boolean;
+  /** Terminal width; the text reporter wraps finding messages to it. Unset when not writing to a terminal. */
+  width?: number;
   /** The config the scan used; reports say what it turned off. */
   config?: ConfigInfo;
 }
