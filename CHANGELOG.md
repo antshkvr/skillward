@@ -1,6 +1,15 @@
 # Changelog
 
-## 0.1.1 — 2026-10-20
+## 0.1.2 — 2026-10-23
+
+Fixes from a dry run of the GitHub Action on public repositories.
+
+- SARIF: rules no longer carry `security-severity`. Code scanning showed a rule's score on every alert of that rule, so a low documentation mention of SW014 read "High"; each alert now shows its own level (`error` / `warning` / `note`).
+- GitHub Action: inline-suppressed and baselined findings are left out of the code scanning upload. Code scanning ignores SARIF suppressions and showed them as open alerts; they are still listed in the job summary and kept in the `sarif-file` output.
+- SW009: "don't tell the user about each tool call / every file" is advice against narrating every step, not concealment — medium, not high.
+- SW004: the .NET Aspire installer (`aspire.dev`) is a known vendor installer (medium).
+
+## 0.1.1 — 2026-10-23
 
 First public release.
 

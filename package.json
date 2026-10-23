@@ -1,6 +1,6 @@
 {
   "name": "skillward",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Shows what you agree to when you give an AI agent a skill, an MCP server or a repo: static scanner for SKILL.md, CLAUDE.md, AGENTS.md, MCP configs, hooks, and Cursor/Copilot/Gemini/Windsurf/Cline rules.",
   "license": "MIT",
   "repository": {

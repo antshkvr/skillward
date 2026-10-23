@@ -200,7 +200,7 @@ discovery  →  parsers  →  rule engine  →  reporters
     ```json
     {
       "version": 1,
-      "tool": { "name": "skillward", "version": "0.1.1" },
+      "tool": { "name": "skillward", "version": "0.1.2" },
       "root": "/abs/path",
       "summary": { "targets": 3, "files": 5, "findings": 2,
                    "bySeverity": { "info": 0, "low": 0, "medium": 1, "high": 1 },
@@ -569,7 +569,7 @@ paste-site command) are still redistributed in GitHub mirrors months after the r
 - [x] **Baseline:** `scan --write-baseline` / `--baseline`, Action input `baseline`.
 - [x] **`--untrusted`** for someone else's code; reports say what the config hides.
 - [x] **`lock`/`verify --global`** for `~/.claude` and the MCP servers in `~/.claude.json`; secrets masked in diffs and snapshots.
-- [ ] **First npm release** (0.1.1).
+- [x] **First npm release** (0.1.1, 2026-10-23).
 - [ ] **Responsible disclosure** of corpus findings; publish the report and launch.
 - [ ] **Corpus rerun** without the gaps above.
 - [x] **SW016 secret-in-config.**
