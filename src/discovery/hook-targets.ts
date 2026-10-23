@@ -21,6 +21,16 @@ const SCRIPT_EXTENSIONS = /\.(?:sh|bash|zsh|fish|command|ps1|psm1|bat|cmd|py|js|
  * project settings, or against the plugin root for plugin hooks. Never executes anything.
  */
 export async function hookTargets(file: string, scanRoot: string, home?: string): Promise<HookTarget[]> {
+  const out: HookTarget[] = [];
+  for (const hook of await hookScriptPaths(file, scanRoot, home)) {
+    const isFile = await lstat(hook.absPath).then((s) => s.isFile(), () => false);
+    if (isFile) out.push(hook);
+  }
+  return out;
+}
+
+/** The script paths inside `scanRoot` that the hooks of `file` name, whether or not they exist on disk. */
+export async function hookScriptPaths(file: string, scanRoot: string, home?: string): Promise<HookTarget[]> {
   let value: unknown;
   try {
     value = JSON.parse(await readFile(file, "utf8"));
@@ -34,8 +44,6 @@ export async function hookTargets(file: string, scanRoot: string, home?: string)
     if (!path) continue;
     const rel = relative(scanRoot, path);
     if (rel === "" || rel.startsWith("..") || isAbsolute(rel)) continue;
-    const isFile = await lstat(path).then((s) => s.isFile(), () => false);
-    if (!isFile) continue;
     out.push({ absPath: path, event });
   }
   return out;

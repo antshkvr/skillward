@@ -108,7 +108,8 @@ export async function discover(options: DiscoveryOptions): Promise<DiscoveryResu
   return { root, targets, skipped };
 }
 
-const HOOK_FILE = /(?:^|\/)(?:\.claude\/settings(?:\.local)?\.json|hooks\/hooks\.json|\.claude-plugin\/plugin\.json|\.cursor\/hooks\.json)$/;
+/** Files whose `hooks` (and `statusLine`) commands can name local scripts; matched on forward-slash paths. */
+export const HOOK_FILE = /(?:^|\/)(?:\.claude\/settings(?:\.local)?\.json|hooks\/hooks\.json|\.claude-plugin\/plugin\.json|\.cursor\/hooks\.json)$/;
 
 /**
  * Adds the local scripts that hooks run to the hook file's target (see SPEC, "Hook targets"), so their content is

@@ -51,6 +51,7 @@
     "corpus:discover": "tsx scripts/corpus/discover.ts",
     "corpus:fetch": "tsx scripts/corpus/fetch.ts",
     "corpus:scan": "tsx scripts/corpus/scan.ts",
+    "corpus:pipeline": "tsx scripts/corpus/pipeline.ts",
     "corpus:recheck": "tsx scripts/corpus/recheck.ts"
   },
   "dependencies": {

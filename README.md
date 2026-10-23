@@ -375,6 +375,7 @@ A new rule is a module in `src/rules/`, registered in `src/rules/index.ts`, with
 npm run corpus:discover            # candidates from sources.json (needs `gh` logged in)
 npm run corpus:fetch               # sparse clones → ../skillward-corpus
 npm run corpus:scan                # results/, summary.md, review-medium.md
+npm run corpus:pipeline -- --dir ~/corpus   # fetch + scan per repo, keeps only results (full runs on a VM)
 npm run corpus:recheck -- --rule SW005 --severity high   # one rule, before/after, grouped samples
 npx tsx scripts/corpus/profile.ts --repo owner/name --rule SW003   # slowest files for a rule
 ```

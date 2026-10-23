@@ -522,12 +522,20 @@ publishing (OIDC, no token in the repository). A version already on npm is skipp
    to `maxRepos`.
 2. `npm run corpus:fetch` — per repository: `git clone --depth 1 --filter=blob:none --no-checkout`, then exactly the
    files discovery reads are selected from the tree (`classifyFile` plus everything in skill folders, no binary
-   extensions) and only those are checked out (sparse). Third-party code never lands on disk in bulk. Hardening: no
-   hooks, submodules or LFS filters, `core.symlinks=false`, no password prompts; paths that can't be created on Windows
-   (and `.git` aliases) are dropped. Metadata (commit SHA, file count, status) goes to `meta/`.
+   extensions, files in hook folders) and only those are checked out (sparse). A second pass reads the checked-out hook
+   files the way discovery does and also checks out the scripts their commands name (`scripts/guard.sh`,
+   `.github/setup.js`), so hook targets and SW017 are measured. At most `--max-files` (default 25,000) per repository,
+   agent files first. Third-party code never lands on disk in bulk. Hardening: no hooks, submodules or LFS filters,
+   `core.symlinks=false`, no password prompts; paths that can't be created on Windows (and `.git` aliases) are
+   dropped. Metadata (commit SHA, file count, hook scripts, files over the cap, status) goes to `meta/`.
 3. `npm run corpus:scan` — an in-process scan with audit settings: the repository's config and inline
    `skillward-ignore` are ignored, so a repository can't hide its own findings. Results: `results/<owner>__<repo>.json`
    (JSON report v1 + `repo`, `sha`), summary `summary.json`/`summary.md`, a review list `review-<severity>.md`.
+
+`npm run corpus:pipeline` does steps 2 and 3 per repository for a full run on a separate machine: fetch, scan, write
+the result, then delete the checkout unless it has a finding to review (`--keep`, default `high`), so the disk holds a
+few repositories at a time. Resumable; `corpus:scan` on the same directory then writes the summary from the stored
+results, including how many hook scripts were fetched and how many repositories hit the file cap.
 
 Nothing from the corpus is executed. False positives found in the corpus become `good` fixtures.
 
@@ -542,7 +550,8 @@ random sample of 60 high findings: ~85% point at a genuinely dangerous pattern (
 security skills). Copies of the ClawHavoc malware campaign (fake "prerequisite" with a password-protected archive or a
 paste-site command) are still redistributed in GitHub mirrors months after the registry removed them.
 
-**Known gaps, to fix before publishing numbers:**
+**Known gaps, to fix before publishing numbers** (the fetch now covers the first two: a 25,000-file cap and the scripts
+hook commands name; the rerun is pending):
 - A cap of 1,500 files per repository truncated 193 large collections (~1.8M files not fetched).
 - The fetch selects agent files only, so scripts that hooks run (`.claude/hooks/*`, plugin `hooks/*`, `.github/*.js`) are
   missing: hook targets and SW017 can't be measured on this corpus. The rerun must add hook directories and the files

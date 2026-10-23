@@ -149,6 +149,22 @@ export function selectAgentFiles(paths: string[], options: { maxFiles: number; p
   return { files, truncated: selected.length - files.length, unportable };
 }
 
+/**
+ * Of the scripts that hook commands name (repo-relative paths), the ones to fetch as well: present in the tree, not
+ * selected yet and, when asked, portable. Binaries are kept, since SW017 reports binary hook targets.
+ */
+export function selectHookScripts(tree: string[], selected: string[], scripts: string[], options: { portable?: boolean } = {}): string[] {
+  const inTree = new Set(tree);
+  const have = new Set(selected);
+  const out: string[] = [];
+  for (const p of scripts) {
+    if (!inTree.has(p) || have.has(p) || (options.portable && !isPortablePath(p))) continue;
+    have.add(p);
+    out.push(p);
+  }
+  return out;
+}
+
 /** A non-cone sparse-checkout pattern that matches exactly this file. */
 export function sparsePattern(path: string): string {
   return "/" + path.replace(/[\\*?[\]!#]/g, (c) => "\\" + c).replace(/^ /, "\\ ").replace(/ $/, "\\ ");

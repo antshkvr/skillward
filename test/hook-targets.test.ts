@@ -4,7 +4,7 @@ import { dirname, join, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { DEFAULT_CONFIG } from "../src/config/index.js";
 import { discover } from "../src/discovery/index.js";
-import { scriptPath } from "../src/discovery/hook-targets.js";
+import { hookScriptPaths, hookTargets, scriptPath } from "../src/discovery/hook-targets.js";
 import { scan } from "../src/engine/index.js";
 import { lock } from "../src/lock/index.js";
 import SW017 from "../src/rules/SW017-hook-script.js";
@@ -80,6 +80,20 @@ describe("discovery: hook targets", () => {
     const { targets } = await discover({ path: root });
     const settingsTarget = targets.find((t) => t.kind === "settings")!;
     expect(settingsTarget.files.map((f) => f.path)).toEqual([".claude/settings.json"]);
+  });
+
+  it("hookScriptPaths names scripts that are not on disk yet, still only inside the scan root", async () => {
+    const root = tree({
+      ".claude/settings.json": JSON.stringify({
+        hooks: {
+          SessionStart: [{ hooks: [{ type: "command", command: "node .github/setup.js" }] }],
+          PreToolUse: [{ hooks: [{ type: "command", command: "bash ../escape.sh" }] }],
+        },
+      }),
+    });
+    const named = await hookScriptPaths(join(root, ".claude/settings.json"), root);
+    expect(named).toEqual([{ absPath: resolve(root, ".github/setup.js"), event: "SessionStart" }]);
+    expect(await hookTargets(join(root, ".claude/settings.json"), root)).toEqual([]);
   });
 
   it("follows ~/.claude/hooks for --global settings", async () => {

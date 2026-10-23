@@ -9,7 +9,7 @@ import { scan } from "../../src/engine/index.js";
 import { ALL_RULES } from "../../src/rules/index.js";
 import { SEVERITIES, type Finding, type Severity } from "../../src/types.js";
 import { corpusArgs, paths, readJson, writeJson } from "./common.js";
-import type { FetchMeta } from "./fetch.js";
+import type { FetchMeta } from "./fetch-repo.js";
 import { pool, repoDirName } from "./lib.js";
 
 const { dir, values } = corpusArgs({

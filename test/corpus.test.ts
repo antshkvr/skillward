@@ -7,6 +7,7 @@ import {
   repoDirName,
   selectAgentFiles,
   selectCandidates,
+  selectHookScripts,
   sparsePattern,
   summarize,
   type RepoReport,
@@ -110,6 +111,16 @@ describe("corpus: selectAgentFiles", () => {
     const sel = selectAgentFiles(["skills/x/SKILL.md", "skills/x/a:b.md", "skills/x/con.txt"], { maxFiles: 10, portable: true });
     expect(sel.files).toEqual(["skills/x/SKILL.md"]);
     expect(sel.unportable).toBe(2);
+  });
+});
+
+describe("corpus: selectHookScripts", () => {
+  it("adds the scripts hooks name that exist in the tree and are not selected yet, once", () => {
+    const tree = [".claude/settings.json", ".claude/hooks/a.sh", "scripts/guard.sh", "tools/bin/check", "x/a:b.sh"];
+    const selected = [".claude/settings.json", ".claude/hooks/a.sh"];
+    const named = [".claude/hooks/a.sh", "scripts/guard.sh", "scripts/guard.sh", "tools/bin/check", "missing.sh", "x/a:b.sh"];
+    expect(selectHookScripts(tree, selected, named, { portable: true })).toEqual(["scripts/guard.sh", "tools/bin/check"]);
+    expect(selectHookScripts(tree, selected, named)).toEqual(["scripts/guard.sh", "tools/bin/check", "x/a:b.sh"]);
   });
 });
 
