@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.3 — 2026-10-23
+
+- Text reports wrap long finding messages at word boundaries to the terminal width, aligned under the message (only when writing to a terminal; files, pipes and CI output are unchanged).
+- Corpus tooling: the fetch also checks out the scripts hook commands name; per-repository cap raised to 25,000 files; `corpus:pipeline` fetches and scans per repository and keeps only results.
+
 ## 0.1.2 — 2026-10-23
 
 Fixes from a dry run of the GitHub Action on public repositories.

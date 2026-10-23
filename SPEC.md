@@ -200,7 +200,7 @@ discovery  →  parsers  →  rule engine  →  reporters
     ```json
     {
       "version": 1,
-      "tool": { "name": "skillward", "version": "0.1.2" },
+      "tool": { "name": "skillward", "version": "0.1.3" },
       "root": "/abs/path",
       "summary": { "targets": 3, "files": 5, "findings": 2,
                    "bySeverity": { "info": 0, "low": 0, "medium": 1, "high": 1 },

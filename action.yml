@@ -10,8 +10,8 @@ inputs:
     description: Directory to scan, relative to the workspace.
     default: "."
   version:
-    description: Exact skillward version from npm (e.g. 0.1.2), or "local" to build from the action's own checkout.
-    default: "0.1.2"
+    description: Exact skillward version from npm (e.g. 0.1.3), or "local" to build from the action's own checkout.
+    default: "0.1.3"
   fail-on:
     description: Lowest severity that fails the job (info, low, medium, high), or "never" to only report.
     default: high
