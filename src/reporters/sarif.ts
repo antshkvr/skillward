@@ -15,9 +15,6 @@ const LEVEL: Record<Severity, "error" | "warning" | "note"> = {
   info: "note",
 };
 
-/** GitHub code scanning maps this to critical/high/medium/low. */
-const SECURITY_SEVERITY: Record<Severity, string> = { high: "8.0", medium: "5.5", low: "3.0", info: "1.0" };
-
 const SRCROOT = "%SRCROOT%";
 
 export interface SarifOptions {
@@ -91,11 +88,10 @@ export function sarifReport(result: ScanResult, options: SarifOptions = {}): obj
               fullDescription: { text: r.description },
               help: { text: r.description },
               defaultConfiguration: { level: LEVEL[r.severity] },
-              properties: {
-                tags: ["security", "ai-agents"],
-                precision: "medium",
-                "security-severity": SECURITY_SEVERITY[r.severity],
-              },
+              // No `security-severity`: code scanning takes it from the rule and shows it on every alert of that rule,
+              // so a low documentation mention of SW014 would read "High". Without it, each alert's severity is its
+              // own `level`.
+              properties: { tags: ["security", "ai-agents"], precision: "medium" },
             })),
           },
         },

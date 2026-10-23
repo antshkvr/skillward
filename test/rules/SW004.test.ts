@@ -96,6 +96,7 @@ describe("SW004 pipe-to-shell", () => {
     '/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"',
     "irm https://astral.sh/uv/install.ps1 | iex",
     'powershell -c "irm bun.sh/install.ps1 | iex"',
+    "curl -sSL https://aspire.dev/install.sh | bash",
   ])("reports official installers of well-known tools as medium: %s", (line) => {
     const findings = checkText(rule, line);
     expect(findings).toHaveLength(1);

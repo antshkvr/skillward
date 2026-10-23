@@ -295,7 +295,7 @@ Columns are 1-based, in UTF-16 code units. Suppressed findings carry a `suppress
 
 ### SARIF
 
-`--format sarif` emits SARIF 2.1.0 for GitHub code scanning. Paths are relative to the current directory (run it from the repository root), files outside it (like `~/.claude`) get absolute `file://` URIs. Levels: high → `error`, medium → `warning`, low/info → `note`; rules carry `security-severity`.
+`--format sarif` emits SARIF 2.1.0 for GitHub code scanning. Paths are relative to the current directory (run it from the repository root), files outside it (like `~/.claude`) get absolute `file://` URIs. Levels: high → `error`, medium → `warning`, low/info → `note`. Rules carry no `security-severity`: GitHub would show a rule's score on every alert of that rule, so a low documentation mention would read "High"; without it, each alert shows its own level.
 
 Or use the GitHub Action below, which does this for you.
 
@@ -322,7 +322,7 @@ jobs:
           fail-on: high
 ```
 
-On `pull_request` events only the files the PR adds or modifies are reported (`only-changed: auto`); on pushes the whole repository is scanned. Results go to the **Security → Code scanning** tab and to the job summary; inline-suppressed findings appear as suppressed alerts.
+On `pull_request` events only the files the PR adds or modifies are reported (`only-changed: auto`); on pushes the whole repository is scanned. Results go to the **Security → Code scanning** tab and to the job summary. Code scanning ignores SARIF suppressions, so inline-suppressed and baselined findings are left out of the upload instead of showing up as open alerts; the job summary still lists them, and the `sarif-file` output keeps them with `suppressions` for other SARIF tools.
 
 | Input | Default | |
 |---|---|---|

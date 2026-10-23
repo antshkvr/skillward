@@ -53,9 +53,12 @@ code=$?
 
 findings=0
 if [ -f "$SARIF_FILE" ]; then
-  # Active results: not inline-suppressed and not in the baseline.
-  findings=$(node -e 'const r = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8")); console.log(r.runs[0].results.filter((x) => !x.suppressions).length)' "$SARIF_FILE")
+  # Code scanning ignores SARIF suppressions: inline-suppressed and baselined results would show up as open alerts.
+  # So the upload gets only the active ones; the job summary lists the rest, and sarif-file keeps them for other tools.
+  upload_file="${RUNNER_TEMP:-$(dirname "$SARIF_FILE")}/skillward-upload.sarif"
+  findings=$(node -e 'const fs = require("fs"); const r = JSON.parse(fs.readFileSync(process.argv[1], "utf8")); for (const run of r.runs) run.results = run.results.filter((x) => !x.suppressions); fs.writeFileSync(process.argv[2], JSON.stringify(r)); console.log(r.runs[0].results.length)' "$SARIF_FILE" "$upload_file")
   echo "sarif-file=$SARIF_FILE" >>"$GITHUB_OUTPUT"
+  echo "upload-file=$upload_file" >>"$GITHUB_OUTPUT"
 fi
 echo "exit-code=$code" >>"$GITHUB_OUTPUT"
 echo "findings=$findings" >>"$GITHUB_OUTPUT"

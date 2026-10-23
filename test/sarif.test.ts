@@ -58,7 +58,8 @@ describe("sarif reporter", () => {
     expect(run.tool.driver.rules.map((r: { id: string }) => r.id)).toEqual(ALL_RULES.map((r) => r.id));
     const sw004 = run.tool.driver.rules.find((r: { id: string }) => r.id === "SW004");
     expect(sw004).toMatchObject({ name: "pipe-to-shell", defaultConfiguration: { level: "error" } });
-    expect(sw004.properties["security-severity"]).toBe("8.0");
+    // Code scanning would show a rule-level security-severity on every alert, whatever the finding's own severity.
+    expect(sw004.properties["security-severity"]).toBeUndefined();
     expect(run.columnKind).toBe("utf16CodeUnits");
   });
 

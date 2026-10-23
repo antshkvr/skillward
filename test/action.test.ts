@@ -140,6 +140,10 @@ process.exit(${exitCode});`,
     expect(out).toContain("exit-code=1");
     expect(out).toContain("findings=2");
     expect(readFileSync(s.summary, "utf8")).toContain("&lt;script&gt;");
+    // Code scanning ignores SARIF suppressions, so suppressed results stay out of the upload but not out of sarif-file.
+    const upload = /^upload-file=(.+)$/m.exec(out)![1]!;
+    expect(JSON.parse(readFileSync(upload, "utf8")).runs[0].results).toEqual([{}, {}]);
+    expect(JSON.parse(readFileSync(s.env.SARIF_FILE, "utf8")).runs[0].results).toHaveLength(3);
   });
 
   it("passes config and baseline paths as single arguments", () => {

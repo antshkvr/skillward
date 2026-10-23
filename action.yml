@@ -105,13 +105,13 @@ runs:
       run: bash "$ACTION_PATH/action/scan.sh"
 
     - name: Upload SARIF to code scanning
-      if: always() && inputs.upload-sarif == 'true' && steps.scan.outputs.sarif-file != ''
+      if: always() && inputs.upload-sarif == 'true' && steps.scan.outputs.upload-file != ''
       # A pull request from a fork gets a read-only token, and GitHub may refuse the upload. The gate below still
       # applies and the report is in the job summary, so a refused upload must not turn the job red.
       continue-on-error: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
       uses: github/codeql-action/upload-sarif@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
       with:
-        sarif_file: ${{ steps.scan.outputs.sarif-file }}
+        sarif_file: ${{ steps.scan.outputs.upload-file }}
         category: ${{ inputs.category }}
 
     - name: Fail on findings

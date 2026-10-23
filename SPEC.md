@@ -111,7 +111,9 @@ gates on `scan --fail-on`. JSON (`--format json`) has its own format version (`1
 
 **SARIF (v0.1):** SARIF 2.1.0 for GitHub code scanning. Paths are relative to the current directory (the repository
 root in CI) via `uriBaseId: %SRCROOT%`; files outside it (e.g. `~/.claude`) use absolute `file://` URIs. Levels:
-high → `error`, medium → `warning`, low/info → `note`; rules carry `security-severity` (8.0 / 5.5 / 3.0 / 1.0). Every
+high → `error`, medium → `warning`, low/info → `note`. Rules carry no `security-severity`: code scanning takes it from the rule descriptor and shows it
+on every alert of that rule, so a low finding of a high rule would read "High" (seen on public repositories); without
+it, each alert's severity is its own `level`. Every
 result has `partialFingerprints["skillward/v1"]` and `properties.confidence`. Suppressed findings carry `suppressions`.
 Rule crashes go to `toolExecutionNotifications`.
 
@@ -491,7 +493,9 @@ to do.
   not supported.
 - Order: scan → SARIF → upload to code scanning (`if: always()`) → fail the job if the exit code ≠ 0 and `fail-on` ≠
   `never`. On a pull request from a fork (read-only token) the upload step has `continue-on-error`: GitHub may refuse
-  the upload, and that must not fail the job — the gate and the job summary don't depend on it (tested). A run error (exit 2) fails the job right away. The text report goes to the job summary (HTML-escaped: it
+  the upload, and that must not fail the job — the gate and the job summary don't depend on it (tested). Code scanning
+  ignores SARIF `suppressions` (an inline-suppressed result became an open alert in a test repository), so the upload is
+  a copy without suppressed and baselined results; `sarif-file` keeps them, and the job summary lists them (tested). A run error (exit 2) fails the job right away. The text report goes to the job summary (HTML-escaped: it
   quotes scanned content).
 - Outputs: `sarif-file`, `exit-code`, `findings` (active, excluding suppressed and baselined).
 - No separate repository for the Action: `uses: owner/skillward@<sha>`. This repository's CI runs its own Action with
