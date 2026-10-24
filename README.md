@@ -179,7 +179,7 @@ Scripts that hooks run (`node .github/setup.js`, `"$CLAUDE_PROJECT_DIR"/.claude/
 | ID | Name | Severity | Catches |
 |----|------|----------|---------|
 | SW001 | hidden-unicode | high | Zero-width characters, bidi overrides (Trojan Source), Unicode tag characters (the hidden text is decoded in the message), variation-selector smuggling. Emoji sequences, Persian/Indic joiners and RTL marks are not reported. |
-| SW002 | html-comment-instructions | medium | Instructions for the agent inside `<!-- … -->` in markdown — invisible when rendered, read by the agent. |
+| SW002 | html-comment-instructions | medium | Instructions for the agent inside `<!-- … -->` in markdown — invisible when rendered, read by the agent. `high` when it tells the agent to send secrets out or hide what it does. |
 | SW003 | encoded-payload | medium | Long base64/hex blobs (decoded safely; high when they decode to commands/URLs), `base64 -d \| sh`, `powershell -enc`, embedded private keys. |
 | SW004 | pipe-to-shell | high | `curl … \| bash`, `wget -O- … \| sh`, `bash <(curl …)`, `sh -c "$(curl …)"`, `iwr … \| iex` and variants. `curl … \| jq` is fine. |
 | SW005 | secret-path-access | high | `~/.ssh` keys, `~/.aws/credentials`, cloud/kube/Docker credentials, `.netrc`, `.git-credentials`, registry tokens, `.env`, the Keychain, browser password stores, wallets. Graded by evidence: a read/send on the same line raises it; public keys and `ssh -i key` are not alarms. |

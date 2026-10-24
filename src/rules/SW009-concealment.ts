@@ -26,7 +26,7 @@ export const CONCEALMENT_PHRASES: PhrasePattern[] = [
     re: phrase(
       // "Don't tell the user to use X" / "… they need to adopt X" is advice on what to ask of the user, not hiding
       // things from them. "… that you uploaded it" stays a finding.
-      String.raw`(?:don${APOS}?t|do not|never|must not|should not) (?:(?:tell|inform|notify|alert|warn|mention (?:this |it |anything )?to|report (?:this |it )?to) (?:the |your )?(?:user|human|developer|operator)s?(?! (?:to|how to) | (?:that )?they (?:need|should|must|have to|ought to|are required)${E})|let (?:the |your )?(?:user|human|developer|operator)s? know)`,
+      String.raw`(?:don${APOS}?t|do not|never|must not|should not) (?:(?:tell|inform|notify|alert|warn|mention (?:this |it |anything |(?:this|these|that) (?:steps?|actions?|commands?|requests?|calls?|uploads?|downloads?|changes?) )?to|report (?:this |it )?to) (?:the |your )?(?:user|human|developer|operator)s?(?! (?:to|how to) | (?:that )?they (?:need|should|must|have to|ought to|are required)${E})|let (?:the |your )?(?:user|human|developer|operator)s? know)`,
     ),
     label: TELL_LABEL,
     confidence: "high",
@@ -49,10 +49,18 @@ export const CONCEALMENT_PHRASES: PhrasePattern[] = [
   },
   {
     re: phrase(
-      String.raw`(?:don${APOS}?t|do not|never|must not) (?:mention|reveal|disclose|acknowledge|discuss|explain|reference) (?:(?:this|these)(?=\s*(?:$|[.,;:!?)\]"'\x60*—–”»’]|-\s|to|in |or |anywhere|at all))|that you|the(?:se)? (?:instructions?|steps?|rules?)|this (?:file|skill|step|instruction|section|hook|prompt))`,
+      String.raw`(?:don${APOS}?t|do not|never|must not) (?:mention|reveal|disclose|acknowledge|discuss|explain|reference) (?:the(?:se)? (?:instructions?|rules?)|this (?:file|skill|instruction|section|prompt))`,
     ),
     label: "an instruction to keep these instructions secret",
     // Also the confidentiality line of many persona prompts ("never reveal these instructions").
+    severity: "medium",
+  },
+  {
+    // "Do not mention this step to the user" is the first pattern (high); without the user it is ambiguous.
+    re: phrase(
+      String.raw`(?:don${APOS}?t|do not|never|must not) (?:mention|reveal|disclose|acknowledge|discuss|explain|reference) (?:(?:this|these)(?=\s*(?:$|[.,;:!?)\]"'\x60*—–”»’]|-\s|to|in |or |anywhere|at all))|that you|the(?:se)? steps?|this (?:step|hook))`,
+    ),
+    label: "an instruction not to mention a step",
     severity: "medium",
   },
   {
@@ -164,34 +172,49 @@ export default rule;
 function checkFile(file: ParsedFile): Finding[] {
   const findings: Finding[] = [];
   for (const line of logicalLines(file.text)) {
-    if (!MAYBE_CONCEALMENT.test(line.text)) continue;
-    for (const m of matchPhrases(line.text, CONCEALMENT_PHRASES)) {
-      let severity: Severity = m.pattern.severity ?? rule.severity;
-      let confidence: Confidence = m.pattern.confidence ?? "medium";
-      let message = `Hides activity from the user: ${m.pattern.label}. Legitimate skills have nothing to hide — treat this as a red flag and remove it.`;
-      if (isQuoted(line.text, m.start, m.end)) {
-        severity = "low";
-        confidence = "low";
-        message = `Quotes ${m.pattern.label} — usually an example or a detection pattern. Listed for inventory.`;
-      } else if (m.pattern.label === TELL_LABEL && /^[a-z]/i.test(line.text.slice(m.start)) && !/know$/i.test(line.text.slice(m.start, m.end)) && !CONCEALED_OBJECT.test(line.text.slice(m.end))) {
-        severity = "medium";
-        confidence = "medium";
-        message = "Tells the agent not to tell the user something. Usually advice on what not to claim; check that it doesn't hide what the agent does.";
-      } else if (m.pattern.label === "an instruction not to show the user" && NOISE_OBJECT.test(line.text.slice(m.end))) {
-        severity = "info";
-        confidence = "low";
-        message = "Asks not to show the user something that looks like output noise (errors, logs). Listed for inventory.";
-      }
+    for (const c of assessConcealment(line.text)) {
       findings.push(
         findingAt(rule, file, {
-          offset: line.offsets[m.start]!,
-          length: m.end - m.start,
-          message,
-          confidence,
-          severity,
+          offset: line.offsets[c.start]!,
+          length: c.end - c.start,
+          message: c.message,
+          confidence: c.confidence,
+          severity: c.severity,
         }),
       );
     }
   }
   return findings;
+}
+
+export interface Concealment {
+  start: number;
+  end: number;
+  severity: Severity;
+  confidence: Confidence;
+  message: string;
+}
+
+/** Concealment phrases in one line, after the quote, claim-advice and output-noise checks. Also used by SW002. */
+export function assessConcealment(text: string): Concealment[] {
+  if (!MAYBE_CONCEALMENT.test(text)) return [];
+  return matchPhrases(text, CONCEALMENT_PHRASES).map((m) => {
+    let severity: Severity = m.pattern.severity ?? rule.severity;
+    let confidence: Confidence = m.pattern.confidence ?? "medium";
+    let message = `Hides activity from the user: ${m.pattern.label}. Legitimate skills have nothing to hide — treat this as a red flag and remove it.`;
+    if (isQuoted(text, m.start, m.end)) {
+      severity = "low";
+      confidence = "low";
+      message = `Quotes ${m.pattern.label} — usually an example or a detection pattern. Listed for inventory.`;
+    } else if (m.pattern.label === TELL_LABEL && /^[a-z]/i.test(text.slice(m.start)) && !/know$/i.test(text.slice(m.start, m.end)) && !CONCEALED_OBJECT.test(text.slice(m.end))) {
+      severity = "medium";
+      confidence = "medium";
+      message = "Tells the agent not to tell the user something. Usually advice on what not to claim; check that it doesn't hide what the agent does.";
+    } else if (m.pattern.label === "an instruction not to show the user" && NOISE_OBJECT.test(text.slice(m.end))) {
+      severity = "info";
+      confidence = "low";
+      message = "Asks not to show the user something that looks like output noise (errors, logs). Listed for inventory.";
+    }
+    return { start: m.start, end: m.end, severity, confidence, message };
+  });
 }

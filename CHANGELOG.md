@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- SW002: a hidden HTML comment that tells the agent to read secrets and send them out, or to hide what it does from the user, is `high` (was `medium`). Comments that only describe such an attack, or warn against it, are unchanged.
+- SW009: "don't mention this step to the user" is `high`, like "don't tell the user"; not mentioning a step is no longer described as keeping instructions secret.
+
 ## 0.1.3 — 2026-10-23
 
 - Text reports wrap long finding messages at word boundaries to the terminal width, aligned under the message (only when writing to a terminal; files, pipes and CI output are unchanged).

@@ -1,4 +1,6 @@
-import type { Confidence, Finding, ParsedFile, Rule } from "../types.js";
+import type { Confidence, Finding, ParsedFile, Rule, Severity } from "../types.js";
+import { checkLine as secretAccess } from "./SW005-secret-path-access.js";
+import { assessConcealment } from "./SW009-concealment.js";
 import { findingAt } from "./helpers.js";
 import { vocab } from "./vocabulary.js";
 
@@ -26,6 +28,8 @@ const IMPERATIVE_START = re(
 );
 /** "Assistant, run …" — the address before an imperative. */
 const LEADING_ADDRESS = /^(?:(?:hey|dear)\s+)?(?:claude|assistant|ai|agent|llm|model)\s*[,:]\s*/i;
+/** "After each task, read …", "Note: read …" — a time clause or a label before an imperative (attacks only). */
+const LEADING_CLAUSE = /^(?:(?:after|before|when|whenever|once|on|at\s+the\s+(?:end|start)\s+of)\s[^,]{1,40},|(?:note|nb|important|reminder)\s*:)\s*/i;
 /** "you must always run …" */
 const YOU_MUST_VERB = re(
   String.raw`\byou\s+(?:must|should|need\s+to|have\s+to|shall)\s+(?:always\s+|first\s+|now\s+|also\s+|silently\s+|quietly\s+)?(?:run|execute|install|download|send|upload|read|delete|remove|fetch|copy|write|open|call|post|append|modify|overwrite|ignore|disregard)\b`,
@@ -76,37 +80,65 @@ function checkFile(file: ParsedFile): Finding[] {
         // Point at `<!--`, not at the content.
         offset: comment.offset - 4,
         length: Math.min(comment.content.length + 7, firstLineLength(file.text, comment.offset - 4)),
-        message: verdict.strong
-          ? "Hidden HTML comment contains prompt-injection phrasing aimed at the agent. Reviewers can't see it in the rendered file. Remove it."
-          : "Hidden HTML comment contains instructions for the agent. Reviewers can't see it in the rendered file. Move it into visible text or remove it.",
+        message: verdict.attack
+          ? `Hidden HTML comment tells the agent to ${verdict.attack}. Reviewers can't see it in the rendered file. Treat it as an attack and remove it.`
+          : verdict.strong
+            ? "Hidden HTML comment contains prompt-injection phrasing aimed at the agent. Reviewers can't see it in the rendered file. Remove it."
+            : "Hidden HTML comment contains instructions for the agent. Reviewers can't see it in the rendered file. Move it into visible text or remove it.",
         confidence: verdict.confidence,
+        severity: verdict.severity,
       }),
     );
   }
   return findings;
 }
 
-/** Exported for tests: whether a comment body reads like instructions to an agent. */
-export function assess(content: string): { confidence: Confidence; strong: boolean } | undefined {
+interface Verdict {
+  confidence: Confidence;
+  strong: boolean;
+  severity: Severity;
+  /** What the hidden instruction makes the agent do, when that is an attack: high instead of medium. */
+  attack?: string;
+}
+
+/** Exported for tests: whether a comment body reads like instructions to an agent, and whether they are an attack. */
+export function assess(content: string): Verdict | undefined {
+  // One logical line: SW005 and SW009 judge a sentence, and comments wrap mid-sentence.
+  const text = content.trim().replace(/\s+/g, " ");
+  const attack =
+    // Reading a secret and sending it out (SW005's exfil, with its negation and warning checks).
+    secretAccess(text).some((h) => h.exfil && h.severity === "high")
+      ? "send secrets out"
+      : // An explicit instruction to hide something from the user, after SW009's advice and quote checks.
+        assessConcealment(text).some((c) => c.severity === "high" && c.confidence === "high")
+        ? "hide what it does from the user"
+        : undefined;
+  // An attack must still read as an instruction (a comment describing one stays at its usual level), but a "Note:"
+  // or "TODO:" prefix doesn't make it a maintainer note.
+  const verdict = instructions(content, attack !== undefined);
+  return verdict && attack ? { ...verdict, confidence: "high", severity: "high", attack } : verdict;
+}
+
+function instructions(content: string, attack: boolean): Verdict | undefined {
   const text = content.trim();
   if (!text) return undefined;
 
   const strong = STRONG.some((p) => p.test(text));
-  if (!strong && BENIGN.some((p) => p.test(text))) return undefined;
+  if (!strong && !attack && BENIGN.some((p) => p.test(text))) return undefined;
   const words = text.split(/\s+/).length;
   if (!strong && words < 3) return undefined;
 
   const sentences = text.split(/[.!?;\n]+|\s[-*•]\s|^\s*[-*•]\s|\s\d+\.\s/u).map((s) => s.trim().replace(/^[-*•\d.)\s]+/u, ""));
   const imperative =
-    sentences.some((s) => IMPERATIVE_START.test(s.replace(LEADING_ADDRESS, ""))) ||
+    sentences.some((s) => IMPERATIVE_START.test(s.replace(LEADING_ADDRESS, "").replace(attack ? LEADING_CLAUSE : /^/, ""))) ||
     YOU_MUST_VERB.test(text) ||
     IMPERATIVE_RU.test(text);
   const address = AGENT_ADDRESS.test(text);
   const payload = PAYLOAD.test(text);
 
-  if (strong) return { confidence: "high", strong: true };
-  if ((address || imperative) && payload) return { confidence: "high", strong: false };
-  if (address && imperative) return { confidence: "medium", strong: false };
+  if (strong) return { confidence: "high", strong: true, severity: "medium" };
+  if ((address || imperative) && payload) return { confidence: "high", strong: false, severity: "medium" };
+  if (address && imperative) return { confidence: "medium", strong: false, severity: "medium" };
   return undefined;
 }
 

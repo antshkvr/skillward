@@ -231,7 +231,7 @@ discovery  →  parsers  →  rule engine  →  reporters
 | ID | Name | Severity | Catches |
 |----|------|----------|---------|
 | SW001 | hidden-unicode | high | Zero-width characters, bidi overrides, Unicode tag characters (U+E0000–E007F) |
-| SW002 | html-comment-instructions | medium | Instructions for the agent inside `<!-- -->` in markdown |
+| SW002 | html-comment-instructions | medium | Instructions for the agent inside `<!-- -->` in markdown (`high` for exfiltration or concealment) |
 | SW003 | encoded-payload | medium | Long base64/hex blobs; high when they decode to commands/URLs |
 | SW004 | pipe-to-shell | high | `curl … \| bash`, `wget … \| sh`, `iwr … \| iex` and variants |
 | SW005 | secret-path-access | high | `~/.ssh`, `~/.aws`, `~/.config/gcloud`, `.env`, the keychain, browser profiles, `~/.netrc` |
@@ -282,7 +282,10 @@ a prose mention without a command → medium; official installers of well-known 
   address/imperative together with a command, URL or secret path; `medium` for an address plus an imperative without
   commands. Skipped (unless injection phrases are present): tool directives (markdownlint, prettier, eslint, cspell,
   toc), `skillward-ignore`, TODO/FIXME/NOTE, licenses, provenance notes (`Source: …`), CAPS markers, comments under
-  3 words.
+  3 words. Raised to `high`/`high` when the hidden instruction is an attack: it reads a secret and sends it out
+  (SW005's exfiltration check, with its negation and warning handling) or tells the agent to hide what it does from
+  the user (SW009's `high`/`high` forms). The comment must still read as an instruction (a time clause or `Note:` before
+  the imperative is allowed then); a comment describing an attack stays unreported.
 - SW003: base64 (≥60 chars, mixed case and digits, entropy ≥4.5), base64url, wrapped lines, hex ≥128, `\xNN` ≥20.
   Decoded without executing: commands/URLs → `high` with a ≤60-char preview; text → `medium`; plain HTML without
   scripts → `low`; binary → `medium`/`low`; MIME bodies of saved e-mails → `info`. Decode-and-exec (`base64 -d | sh`,
@@ -320,7 +323,8 @@ a prose mention without a command → medium; official installers of well-known 
   the object is what the agent does ("about this", "what you did", end of clause); "don't tell the user *that X*"
   (advice on what not to claim) → `medium`. "Don't tell the user **to** …" isn't reported. "Without telling the user"
   → `medium`. "silently/quietly + verb" only as an imperative, `medium`. "Don't show the user raw stack traces/logs"
-  → `info`; other "don't show the user" → `medium`. Keeping instructions secret → `medium`. Quoted phrases → `low`.
+  → `info`; other "don't show the user" → `medium`. "Don't mention this step/these requests to the user" → `high`, like "don't tell the
+  user". Keeping instructions secret, or not mentioning a step without naming the user → `medium`. Quoted phrases → `low`.
 - SW010: a prerequisite phrase within ±3 logical lines of an external artifact: an executable/script URL, a GitHub
   release download, `curl -o … && chmod +x`, a package installed from a URL. Named packages (`pip install pypdf`,
   `brew install`) are never reported. **High:** a download from a password-protected archive, and a paste-site page
