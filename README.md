@@ -19,6 +19,13 @@ It flags hidden text, remote code execution, credential access, permission bypas
 
 Requires Node.js 22.12+.
 
+> **The npm package is temporarily unavailable.** Until it is back, install from source and use `skillward` wherever this README says `npx skillward`; in the GitHub Action, set `version: local`.
+>
+> ```sh
+> git clone https://github.com/antshkvr/skillward && cd skillward
+> npm ci && npm run build && npm install -g .
+> ```
+
 **Before you open someone else's repository or install a skill**, see what it would let the agent do:
 
 ```sh
