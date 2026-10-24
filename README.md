@@ -387,7 +387,7 @@ npm run corpus:scan                # results/, summary.md, review-medium.md
 npm run corpus:pipeline -- --dir ~/corpus   # fetch + scan per repo, keeps only results (full runs on a VM)
 npm run corpus:recheck -- --rule SW005 --severity high   # one rule, before/after, grouped samples
 npx tsx scripts/corpus/profile.ts --repo owner/name --rule SW003   # slowest files for a rule
-npx tsx scripts/corpus/sample.ts --severity high --n 100 --seed 1   # random sample to label; --report <name> for precision
+npx tsx scripts/corpus/sample.ts --severity high --n 100 --seed 1   # random sample to label; --report <name> for precision, --from/--agree for a second rater
 ```
 
 A false positive found this way becomes a `good` fixture.

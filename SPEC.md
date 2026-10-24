@@ -550,7 +550,9 @@ straight from git objects in memory (for files antivirus removed from the workin
 a reproducible random sample of findings at a severity (`--n`, `--seed`) with the lines around each one, read at the
 scanned commit with secrets masked, for labelling by hand (`malicious` / `dangerous` / `offensive` / `benign` /
 `unclear`); `--report` gives precision with a 95 % Wilson interval (per finding and per distinct content) and a per-rule
-breakdown. Results from mixed scanner versions are refused.
+breakdown. Results from mixed scanner versions are refused. For a second rater, `--from <sample>` draws a blind
+subsample (labels and notes not copied) and `--agree <sample> --with <subsample>` reports agreement and Cohen's κ, on
+the five labels and on the true/false split.
 
 **First run (2026-10-20):** 3,000 candidates → 2,917 repositories with agent files, 573k files. Before tuning: 55,539
 findings, 25,250 high, a high finding in 40% of repositories. After: 46,777 findings, 6,604 high, 17.8%. A hand-labelled

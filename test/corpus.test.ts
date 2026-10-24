@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  cohenKappa,
   contextLines,
   isPortablePath,
   parseRepoLinks,
@@ -142,6 +143,21 @@ describe("corpus: precision sampling", () => {
     expect(high).toBeCloseTo(0.9191, 3);
     expect(wilson(0, 0)).toEqual({ p: 0, low: 0, high: 0 });
     expect(wilson(10, 10).high).toBe(1);
+  });
+
+  it("cohenKappa matches the textbook example", () => {
+    // 50 items: both yes 20, A yes / B no 5, A no / B yes 10, both no 15 → po 0.7, pe 0.5, κ 0.4.
+    const pairs: [boolean, boolean][] = [
+      ...Array<[boolean, boolean]>(20).fill([true, true]),
+      ...Array<[boolean, boolean]>(5).fill([true, false]),
+      ...Array<[boolean, boolean]>(10).fill([false, true]),
+      ...Array<[boolean, boolean]>(15).fill([false, false]),
+    ];
+    const { agreement, kappa } = cohenKappa(pairs);
+    expect(agreement).toBeCloseTo(0.7, 5);
+    expect(kappa).toBeCloseTo(0.4, 5);
+    expect(cohenKappa([["a", "a"], ["a", "a"]])).toEqual({ agreement: 1, kappa: 1 });
+    expect(cohenKappa([])).toEqual({ agreement: 0, kappa: 0 });
   });
 
   it("contextLines returns the window around a line, clipped and cut", () => {

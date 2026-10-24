@@ -386,6 +386,18 @@ export function wilson(k: number, n: number, z = 1.96): { p: number; low: number
   return { p, low: Math.max(0, center - half), high: Math.min(1, center + half) };
 }
 
+/** Cohen's κ for two raters' labels of the same items: agreement beyond what their label frequencies give by chance. */
+export function cohenKappa<T>(pairs: [T, T][]): { agreement: number; kappa: number } {
+  const n = pairs.length;
+  if (n === 0) return { agreement: 0, kappa: 0 };
+  const po = pairs.filter(([a, b]) => a === b).length / n;
+  const labels = new Set(pairs.flat());
+  let pe = 0;
+  for (const l of labels) pe += (pairs.filter(([a]) => a === l).length / n) * (pairs.filter(([, b]) => b === l).length / n);
+  // Both raters used one and the same label for everything: agreement is total, chance agreement too.
+  return { agreement: po, kappa: pe === 1 ? 1 : (po - pe) / (1 - pe) };
+}
+
 /** Lines `line ± radius` (1-based) of `text`, each cut to `width` characters. */
 export function contextLines(text: string, line: number, radius: number, width = 200): { n: number; text: string }[] {
   const lines = text.split(/\r?\n/);
