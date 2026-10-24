@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { classifyFile } from "../src/discovery/index.js";
 import {
   cohenKappa,
   contextLines,
@@ -109,6 +110,49 @@ describe("corpus: selectAgentFiles", () => {
     const sel = selectAgentFiles(["a.py", "b.py", "SKILL.md", ".mcp.json"], { maxFiles: 2 });
     expect(sel.files.slice(0, 2)).toEqual(["SKILL.md", ".mcp.json"]);
     expect(sel.truncated).toBe(2);
+  });
+
+  it("selects the same files as a plain scan over every skill and plugin, on random trees", () => {
+    // The selection before parent-directory lookups: every path checked against every skill and plugin directory.
+    const reference = (paths: string[], maxFiles: number) => {
+      const abs = (p: string) => `/r/${p}`;
+      const dirOf = (p: string) => (p.includes("/") ? p.slice(0, p.lastIndexOf("/")) : "");
+      const skillDirs = paths.filter((p) => p === "SKILL.md" || p.endsWith("/SKILL.md")).map(dirOf);
+      const pluginRoots = paths
+        .filter((p) => p === ".claude-plugin/plugin.json" || p.endsWith("/.claude-plugin/plugin.json"))
+        .map((p) => abs(p).slice(0, -"/.claude-plugin/plugin.json".length));
+      const pluginDirs = pluginRoots.map((r) => r.slice("/r/".length));
+      const inSkill = (p: string) => skillDirs.some((d) => d === "" || p.startsWith(d + "/"));
+      const inHookDir = (p: string) =>
+        /(?:^|\/)\.(?:claude|cursor)\/hooks\//.test(p) || pluginDirs.some((d) => p.startsWith(d === "" ? "hooks/" : `${d}/hooks/`));
+      const isAgentFile = (p: string) => p === "SKILL.md" || p.endsWith("/SKILL.md") || !!classifyFile(abs(p), pluginRoots);
+      const selected = paths.filter((p) => inSkill(p) || isAgentFile(p) || inHookDir(p));
+      selected.sort((a, b) => Number(!isAgentFile(a)) - Number(!isAgentFile(b)));
+      return selected.slice(0, maxFiles);
+    };
+    let seed = 42;
+    const rand = (n: number) => (seed = (seed * 16807) % 2147483647) % n;
+    const dirs = ["", "a", "a/b", "plugins/p", "plugins/p/sub", "skills/x", "skills/x/deep", "hooks", "a/hooks", ".claude", ".claude/hooks"];
+    const names = ["SKILL.md", "README.md", "run.sh", "CLAUDE.md", "AGENTS.md", ".mcp.json", "notes.txt", "commands/go.md", "agents/a.md",
+      "hooks/hooks.json", "hooks/guard.sh", ".claude-plugin/plugin.json", "settings.json", "x.py"];
+    for (let round = 0; round < 300; round++) {
+      const tree = [...new Set(Array.from({ length: 1 + rand(40) }, () => {
+        const d = dirs[rand(dirs.length)]!;
+        const n = names[rand(names.length)]!;
+        return d ? `${d}/${n}` : n;
+      }))];
+      const max = 1 + rand(30);
+      expect(selectAgentFiles(tree, { maxFiles: max }).files, JSON.stringify(tree)).toEqual(reference(tree, max));
+    }
+  });
+
+  it("stays fast on a tree of 130k files with thousands of skills", () => {
+    const tree: string[] = [];
+    for (let s = 0; s < 6000; s++) for (let f = 0; f < 22; f++) tree.push(`skills/s${s}/${f === 0 ? "SKILL.md" : `ref/f${f}.md`}`);
+    const started = performance.now();
+    const sel = selectAgentFiles(tree, { maxFiles: 25_000 });
+    expect(sel.files).toHaveLength(25_000);
+    expect(performance.now() - started).toBeLessThan(5_000);
   });
 
   it("drops paths that cannot be checked out on Windows when asked", () => {

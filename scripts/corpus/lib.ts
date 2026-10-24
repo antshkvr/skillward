@@ -119,34 +119,49 @@ export function selectAgentFiles(paths: string[], options: { maxFiles: number; p
   // classifyFile matches absolute forward-slash paths; a fake root makes `/.claude/` match at the repo root too.
   const abs = (p: string) => `/r/${p}`;
   const dirOf = (p: string) => (p.includes("/") ? p.slice(0, p.lastIndexOf("/")) : "");
-  const skillDirs = paths.filter((p) => p === "SKILL.md" || p.endsWith("/SKILL.md")).map(dirOf);
-  const pluginRoots = paths
+  // Lookups go through each path's parent directories, not through every skill or plugin: trees of 100k+ files with
+  // thousands of skills would otherwise take billions of comparisons.
+  const ancestors = (p: string) => {
+    const out: string[] = [];
+    for (let i = p.lastIndexOf("/"); i > 0; i = p.lastIndexOf("/", i - 1)) out.push(p.slice(0, i));
+    return out;
+  };
+  const skillDirs = new Set(paths.filter((p) => p === "SKILL.md" || p.endsWith("/SKILL.md")).map(dirOf));
+  const pluginDirs = paths
     .filter((p) => p === ".claude-plugin/plugin.json" || p.endsWith("/.claude-plugin/plugin.json"))
-    .map((p) => abs(p).slice(0, -"/.claude-plugin/plugin.json".length));
-  const inSkill = (p: string) => skillDirs.some((d) => d === "" || p.startsWith(d + "/"));
+    .map((p) => p.slice(0, -".claude-plugin/plugin.json".length).replace(/\/$/, ""));
+  const pluginIndex = new Map(pluginDirs.map((d, i) => [d, i]));
+  const inSkill = (p: string) => skillDirs.has("") || ancestors(p).some((d) => skillDirs.has(d));
   // Scripts hooks run usually live next to the hook config; discovery attaches them (hook targets).
-  const pluginDirs = pluginRoots.map((r) => r.slice("/r/".length));
   const inHookDir = (p: string) =>
-    /(?:^|\/)\.(?:claude|cursor)\/hooks\//.test(p) || pluginDirs.some((d) => p.startsWith(d === "" ? "hooks/" : `${d}/hooks/`));
+    /(?:^|\/)\.(?:claude|cursor)\/hooks\//.test(p) ||
+    ancestors(p).some((d) => (d === "hooks" ? pluginIndex.has("") : d.endsWith("/hooks") && pluginIndex.has(d.slice(0, -"/hooks".length))));
+  // classifyFile only looks at the plugins that contain the file; pass those, in the order the tree lists them.
+  const pluginRootsOf = (p: string) =>
+    [...(pluginIndex.has("") ? [""] : []), ...ancestors(p).filter((d) => pluginIndex.has(d))]
+      .sort((a, b) => pluginIndex.get(a)! - pluginIndex.get(b)!)
+      .map((d) => (d === "" ? "/r" : abs(d)));
 
   // Agent files proper (SKILL.md, instructions, configs) come first, so a huge skill does not crowd them out.
-  const isAgentFile = (p: string) => p === "SKILL.md" || p.endsWith("/SKILL.md") || !!classifyFile(abs(p), pluginRoots);
+  const isAgentFile = (p: string) => p === "SKILL.md" || p.endsWith("/SKILL.md") || !!classifyFile(abs(p), pluginRootsOf(p));
 
   let unportable = 0;
-  const selected: string[] = [];
+  const selected: { path: string; agent: boolean }[] = [];
   for (const p of paths) {
     const ext = p.includes(".") ? p.slice(p.lastIndexOf(".") + 1).toLowerCase() : "";
     if (BINARY_EXTENSIONS.has(ext)) continue;
-    if (!inSkill(p) && !isAgentFile(p) && !inHookDir(p)) continue;
+    const agent = isAgentFile(p);
+    if (!agent && !inSkill(p) && !inHookDir(p)) continue;
     if (options.portable && !isPortablePath(p)) {
       unportable++;
       continue;
     }
-    selected.push(p);
+    selected.push({ path: p, agent });
   }
-  selected.sort((a, b) => Number(!isAgentFile(a)) - Number(!isAgentFile(b)));
-  const files = selected.slice(0, options.maxFiles);
-  return { files, truncated: selected.length - files.length, unportable };
+  // Stable: agent files first, each group in tree order.
+  const ordered = [...selected.filter((s) => s.agent), ...selected.filter((s) => !s.agent)].map((s) => s.path);
+  const files = ordered.slice(0, options.maxFiles);
+  return { files, truncated: ordered.length - files.length, unportable };
 }
 
 /**
