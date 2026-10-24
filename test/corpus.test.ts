@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
+  contextLines,
   isPortablePath,
   parseRepoLinks,
   renderReview,
   renderSummary,
   repoDirName,
+  sampleIndices,
   selectAgentFiles,
   selectCandidates,
   selectHookScripts,
@@ -12,6 +14,7 @@ import {
   summarize,
   type RepoReport,
   type ReportFinding,
+  wilson,
 } from "../scripts/corpus/lib.js";
 
 describe("corpus: parseRepoLinks", () => {
@@ -111,6 +114,42 @@ describe("corpus: selectAgentFiles", () => {
     const sel = selectAgentFiles(["skills/x/SKILL.md", "skills/x/a:b.md", "skills/x/con.txt"], { maxFiles: 10, portable: true });
     expect(sel.files).toEqual(["skills/x/SKILL.md"]);
     expect(sel.unportable).toBe(2);
+  });
+});
+
+describe("corpus: precision sampling", () => {
+  it("sampleIndices draws distinct indices in range, reproducibly per seed", () => {
+    const a = sampleIndices(1000, 50, 7);
+    expect(a).toHaveLength(50);
+    expect(new Set(a).size).toBe(50);
+    expect(a.every((i) => i >= 0 && i < 1000)).toBe(true);
+    expect(a).toEqual([...a].sort((x, y) => x - y));
+    expect(sampleIndices(1000, 50, 7)).toEqual(a);
+    expect(sampleIndices(1000, 50, 8)).not.toEqual(a);
+    expect(sampleIndices(5, 10, 1)).toEqual([0, 1, 2, 3, 4]);
+  });
+
+  it("sampleIndices is roughly uniform", () => {
+    const hits = new Array(10).fill(0);
+    for (let seed = 1; seed <= 2000; seed++) for (const i of sampleIndices(10, 1, seed)) hits[i]++;
+    for (const h of hits) expect(h).toBeGreaterThan(140);
+  });
+
+  it("wilson matches the textbook interval", () => {
+    const { p, low, high } = wilson(51, 60);
+    expect(p).toBeCloseTo(0.85, 5);
+    expect(low).toBeCloseTo(0.7386, 3);
+    expect(high).toBeCloseTo(0.9191, 3);
+    expect(wilson(0, 0)).toEqual({ p: 0, low: 0, high: 0 });
+    expect(wilson(10, 10).high).toBe(1);
+  });
+
+  it("contextLines returns the window around a line, clipped and cut", () => {
+    const text = ["a", "b", "c", "d", "x".repeat(300)].join("\n");
+    expect(contextLines(text, 1, 1)).toEqual([{ n: 1, text: "a" }, { n: 2, text: "b" }]);
+    const last = contextLines(text, 5, 1, 10);
+    expect(last.map((l) => l.n)).toEqual([4, 5]);
+    expect(last[1]!.text).toBe(`${"x".repeat(10)}…`);
   });
 });
 

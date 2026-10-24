@@ -542,7 +542,11 @@ Nothing from the corpus is executed. False positives found in the corpus become 
 Tuning tools: `npm run corpus:recheck -- --rule SWxxx [--severity high] [--grep re] [--on SWyyy]` re-runs one rule on
 the files a rule flagged (before/after by severity, grouped samples); `npx tsx scripts/corpus/profile.ts --repo
 owner/name [--rule SWxxx]` shows per-rule time and the slowest files; `scripts/corpus/scan-blob.ts` scans files
-straight from git objects in memory (for files antivirus removed from the working tree).
+straight from git objects in memory (for files antivirus removed from the working tree). `scripts/corpus/sample.ts` draws
+a reproducible random sample of findings at a severity (`--n`, `--seed`) with the lines around each one, read at the
+scanned commit with secrets masked, for labelling by hand (`malicious` / `dangerous` / `offensive` / `benign` /
+`unclear`); `--report` gives precision with a 95 % Wilson interval (per finding and per distinct content) and a per-rule
+breakdown. Results from mixed scanner versions are refused.
 
 **First run (2026-10-20):** 3,000 candidates → 2,917 repositories with agent files, 573k files. Before tuning: 55,539
 findings, 25,250 high, a high finding in 40% of repositories. After: 46,777 findings, 6,604 high, 17.8%. A hand-labelled

@@ -353,6 +353,52 @@ export function renderReview(reports: RepoReport[], minSeverity: Severity): stri
   return lines.join("\n");
 }
 
+// ---- Precision sampling --------------------------------------------------------------------------------------
+
+/** `n` distinct indices from `[0, total)`, uniformly at random and reproducible for a given seed, in sorted order. */
+export function sampleIndices(total: number, n: number, seed: number): number[] {
+  let state = seed >>> 0 || 1;
+  // mulberry32
+  const next = () => {
+    state = (state + 0x6d2b79f5) >>> 0;
+    let x = state;
+    x = Math.imul(x ^ (x >>> 15), x | 1);
+    x ^= x + Math.imul(x ^ (x >>> 7), x | 61);
+    return ((x ^ (x >>> 14)) >>> 0) / 4294967296;
+  };
+  const picked = new Map<number, number>(); // partial Fisher–Yates over a virtual array
+  const out: number[] = [];
+  for (let i = 0; i < Math.min(n, total); i++) {
+    const j = i + Math.floor(next() * (total - i));
+    out.push(picked.get(j) ?? j);
+    picked.set(j, picked.get(i) ?? i);
+  }
+  return out.sort((a, b) => a - b);
+}
+
+/** Wilson score interval for `k` successes out of `n` (95 % by default). */
+export function wilson(k: number, n: number, z = 1.96): { p: number; low: number; high: number } {
+  if (n === 0) return { p: 0, low: 0, high: 0 };
+  const p = k / n;
+  const denom = 1 + (z * z) / n;
+  const center = (p + (z * z) / (2 * n)) / denom;
+  const half = (z * Math.sqrt((p * (1 - p)) / n + (z * z) / (4 * n * n))) / denom;
+  return { p, low: Math.max(0, center - half), high: Math.min(1, center + half) };
+}
+
+/** Lines `line ± radius` (1-based) of `text`, each cut to `width` characters. */
+export function contextLines(text: string, line: number, radius: number, width = 200): { n: number; text: string }[] {
+  const lines = text.split(/\r?\n/);
+  const from = Math.max(1, line - radius);
+  const to = Math.min(lines.length, line + radius);
+  const out: { n: number; text: string }[] = [];
+  for (let n = from; n <= to; n++) {
+    const l = lines[n - 1]!;
+    out.push({ n, text: l.length > width ? `${l.slice(0, width)}…` : l });
+  }
+  return out;
+}
+
 /** Runs `fn` over `items` with at most `limit` in flight. */
 export async function pool<T>(items: T[], limit: number, fn: (item: T, index: number) => Promise<void>): Promise<void> {
   let next = 0;
