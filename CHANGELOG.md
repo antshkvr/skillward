@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 0.1.4 — unreleased
+
+0.1.3 was tagged but not published to npm; its changes ship in this release.
 
 - SW002: a hidden HTML comment that tells the agent to read secrets and send them out, or to hide what it does from the user, is `high` (was `medium`). Comments that only describe such an attack, or warn against it, are unchanged.
 - SW009: "don't mention this step to the user" is `high`, like "don't tell the user"; not mentioning a step is no longer described as keeping instructions secret.
