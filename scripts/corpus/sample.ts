@@ -5,6 +5,9 @@
 //   npx tsx scripts/corpus/sample.ts --dir ~/corpus --severity high --n 100 --seed 1 --name high-1
 //   (label: set each item's "label" in labels/high-1.json to malicious | dangerous | offensive | benign | unclear)
 //   npx tsx scripts/corpus/sample.ts --dir ~/corpus --report high-1
+// Per repository: --per-repo draws repositories with a finding of that severity, then one finding from each, so a few
+// huge collections don't make up most of the sample.
+//   npx tsx scripts/corpus/sample.ts --dir ~/corpus --severity high --per-repo --n 100 --seed 1 --name high-repo-1
 // Second rater: a blind subsample of a labelled sample (no labels or notes copied), then agreement and Cohen's κ.
 //   npx tsx scripts/corpus/sample.ts --dir ~/corpus --from high-1 --n 20 --seed 2 --name high-1-blind
 //   npx tsx scripts/corpus/sample.ts --dir ~/corpus --agree high-1 --with high-1-blind
@@ -52,6 +55,8 @@ interface SampleFile {
   tool: string;
   severity: string;
   seed: number;
+  /** What was drawn at random: findings, or repositories (one finding each). Older samples have no unit: findings. */
+  unit?: "finding" | "repo";
   /** A blind subsample: the sample it was drawn from. */
   from?: string;
   population: number;
@@ -61,6 +66,7 @@ interface SampleFile {
 
 const { dir, values } = corpusArgs({
   severity: { type: "string", default: "high" },
+  "per-repo": { type: "boolean", default: false },
   n: { type: "string", default: "100" },
   seed: { type: "string", default: "1" },
   name: { type: "string" },
@@ -82,9 +88,9 @@ const fence = (s: string) => s.replace(/~~~/g, "~ ~~");
 async function writeSample(sample: SampleFile): Promise<void> {
   await writeJson(join(labelsDir, `${sample.name}.json`), sample);
   const md = [
-    `# ${sample.name}: ${sample.items.length} random ${sample.severity} findings${sample.from ? ` (blind subsample of ${sample.from})` : ""}`,
+    `# ${sample.name}: ${sample.items.length} random ${sample.severity} findings${sample.unit === "repo" ? ", one per random repository" : ""}${sample.from ? ` (blind subsample of ${sample.from})` : ""}`,
     "",
-    `Population: ${sample.population} ${sample.severity} findings in ${sample.repos} repositories; seed ${sample.seed}; ${sample.tool}.`,
+    `Population: ${sample.population} ${sample.severity} findings in ${sample.repos} repositories; drawn by ${sample.unit ?? "finding"}; seed ${sample.seed}; ${sample.tool}.`,
     `Label each item in ${sample.name}.json: ${LABELS.join(" | ")}.`,
     "",
     "- **malicious**: built to harm the user (exfiltration, a payload, concealment of what it does).",
@@ -210,7 +216,21 @@ const copyKey = (f: ReportFinding) => `${f.ruleId}\0${f.snippet}`;
 const copies = new Map<string, number>();
 for (const { finding } of population) copies.set(copyKey(finding), (copies.get(copyKey(finding)) ?? 0) + 1);
 
-const picked = sampleIndices(population.length, n, seed).map((i) => population[i]!);
+const perRepo = values["per-repo"] as boolean;
+// Per repository: repositories in result-file order, then one finding of each, drawn with a seed of its own.
+const byRepo = new Map<string, typeof population>();
+for (const x of population) {
+  const list = byRepo.get(x.repo);
+  if (list) list.push(x);
+  else byRepo.set(x.repo, [x]);
+}
+const repoList = [...byRepo.values()];
+const picked = perRepo
+  ? sampleIndices(repoList.length, n, seed).map((i) => {
+      const findings = repoList[i]!;
+      return findings[sampleIndices(findings.length, 1, seed * 100_003 + i)[0]!]!;
+    })
+  : sampleIndices(population.length, n, seed).map((i) => population[i]!);
 const files = new Map<string, Promise<string>>();
 const rawUrl = (repo: string, sha: string, file: string) =>
   `https://raw.githubusercontent.com/${repo}/${sha}/${file.split("/").map(encodeURIComponent).join("/")}`;
@@ -255,6 +275,7 @@ await writeSample({
   tool: `skillward ${[...versions][0] ?? "unknown"}`,
   severity,
   seed,
+  unit: perRepo ? "repo" : "finding",
   population: population.length,
   repos: repos.size,
   items,
