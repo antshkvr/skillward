@@ -593,7 +593,10 @@ fourth needs a rescan of the affected repositories):
   corpus on a machine without real-time antivirus interference (a VM), and report antivirus detections separately.
 - Up to 0.1.3, discovery put settings, MCP configs and plugin manifests inside a skill folder into the skill, so SW011,
   SW012 and SW017 skipped them: in the rerun, 1,157 such files in 134 repositories (41 with `SKILL.md` at the
-  root). Rescan those repositories with 0.1.4.
+  root). Rescanned with 0.1.4 (2026-10-25): in the 2,600 repositories whose commit did not change, these files
+  became 810 targets of their own and added 36 SW011 and 35 SW012 findings (15 and 5 repositories); no finding
+  disappeared or changed severity, and SW013 and SW017 counts are unchanged. 194 of the 200 labelled high findings are
+  identical in the rerun; the other 6 are gone because their repositories changed.
 
 ## 12. Later: team edition (not before there are users)
 
