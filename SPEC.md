@@ -72,7 +72,7 @@ malware detection, quarantine and background protection do not.
 
 ```
 skillward scan [path]          # current directory by default
-  --global                     # also check ~/.claude
+  --global                     # also check ~/.claude and other agents' user configuration
   --format text|json|sarif     # text by default
   --output <file>
   --fail-on info|low|medium|high   # exit-code threshold, high by default
@@ -86,7 +86,7 @@ skillward explain [path]       # what each target lets the agent do (capability 
 
 skillward lock [path]          # create/update skillward.lock
 skillward verify [path]        # compare with the lockfile, show a diff
-skillward lock --global        # ~/.claude + MCP servers of ~/.claude.json → ~/.skillward/skillward.lock
+skillward lock --global        # what scan --global reads → ~/.skillward/skillward.lock
 skillward verify --global
 skillward rules                # list rules with descriptions
 skillward sandbox <skill-path> # v0.2, see section 7
@@ -145,7 +145,10 @@ discovery  →  parsers  →  rule engine  →  reporters
       `.windsurfrules`, `.windsurf/rules/**/*.md`, `.windsurf/workflows/**/*.md`; Cline `.clinerules` (a file, or
       `.clinerules/**/*.md`); Kiro `.kiro/steering/**/*.md`; Gemini CLI custom commands `.gemini/commands/**/*.toml`.
     - `mcp-config`: `.cursor/mcp.json`, `.vscode/mcp.json` (servers under `servers`), `.gemini/settings.json`,
-      `.kiro/settings/mcp.json`.
+      `.kiro/settings/mcp.json`, Gemini CLI extension manifests `.gemini/extensions/<name>/gemini-extension.json`
+      (installable third-party packages with their own `mcpServers`; an extension's `GEMINI.md` and
+      `commands/**/*.toml` are `instructions`). Remote servers are named by `url`, Windsurf's `serverUrl` or Gemini's
+      `httpUrl`.
     - `settings`: Cursor hooks `.cursor/hooks.json` (`{"version": 1, "hooks": {event: [{"command": …}]}}`; scripts run
       from the project root).
     - These folders and files are agent configuration, so `.gitignore` doesn't hide them either (`.cursor/`,
@@ -160,7 +163,20 @@ discovery  →  parsers  →  rule engine  →  reporters
   - A file passed explicitly to `scan <file>` is always scanned; an unknown name is treated as `instructions`.
     `scan path/SKILL.md` scans the whole skill.
   - `--global` only looks at `CLAUDE.md`, `settings*.json`, `skills/`, `agents/`, `commands/`, `plugins/` in
-    `~/.claude` — transcripts, caches and todos are left alone.
+    `~/.claude` — transcripts, caches and todos are left alone. It also reads other agents' user configuration, only at
+    these paths (nothing else in the home directory is walked: `~/.gemini` holds OAuth credentials, `~/.cline/data`
+    task history):
+    - Cursor: `~/.cursor/mcp.json`, `~/.cursor/hooks.json` (user hooks run from `~/.cursor/`, so their script paths
+      resolve there), `~/.cursor/commands/`, `~/.cursor/skills/`.
+    - Gemini CLI: `~/.gemini/settings.json`, `~/.gemini/GEMINI.md`, `~/.gemini/commands/`, `~/.gemini/extensions/`.
+    - Windsurf: `~/.codeium/windsurf/mcp_config.json` (`mcp-config`), `memories/global_rules.md` and
+      `global_workflows/*.md` (`instructions`).
+    - Cline: `~/.cline/data/settings/cline_mcp_settings.json` and, from older versions, the VS Code extension's
+      `User/globalStorage/saoudrizwan.claude-dev/settings/cline_mcp_settings.json` (under `AppData/Roaming/Code`,
+      `Library/Application Support/Code` or `.config/Code`) as `mcp-config`; `~/.cline/rules/`, `~/.cline/workflows/`,
+      `~/Documents/Cline/Rules/`, `~/Documents/Cline/Workflows/` (`*.md`, `instructions`); `~/.cline/skills/`;
+      `~/.agents/AGENTS.md`, `~/.agents/skills/`.
+    - Kiro: `~/.kiro/settings/mcp.json`, `~/.kiro/steering/`. Codex: `~/.codex/AGENTS.md`, `~/.codex/skills/`.
   - Files over 2 MB and binary files (a NUL in the first 8 KB) are skipped and listed in `skipped`.
   - **Hook targets.** A command hook in a `settings` target or plugin hooks file that runs a local script
     (`node .github/setup.js`, `"${CLAUDE_PROJECT_DIR}"/.claude/hooks/x.sh`, `${CLAUDE_PLUGIN_ROOT}/hooks/run.sh`, `bash
@@ -337,7 +353,7 @@ a prose mention without a command → medium; official installers of well-known 
 - SW011: `npx`/`bunx`/`bun x`/`npm exec`, `pnpm dlx`/`yarn dlx`, `uvx`/`uv tool run`, `pipx run`, `docker`/`podman
   run`, including via `cmd /c` and as a single string without `args`. No version / `@latest` / dist-tag / git URL
   without SHA → `medium`; a version range → `low`; a docker tag other than `latest` → `info` (pin a digest).
-- SW012: every remote server → `low` (host and auth header names, no values); `http://` to a non-local host or
+- SW012: every remote server (`url`, `serverUrl`, `httpUrl`) → `low` (host and auth header names, no values); `http://` to a non-local host or
   credentials in the URL → `medium`. Loopback isn't reported; empty placeholders are skipped; `${VAR}` URLs are reported
   with their default host.
 - SW013: a hook that starts a script shipped with the project/plugin → `low`; inline shell, absolute or out-of-project
@@ -447,7 +463,9 @@ to do.
   characters and the length). Snapshots are committed with the lock, so they must not copy secrets; both sides of a
   diff are masked, and a change only inside a masked value is reported as "only masked secret values changed".
 - **`lock`/`verify --global`** pin the user's own configuration: what `scan --global` reads in `~/.claude` (with
-  hook scripts) and `~/.claude.json`, without walking a project. State lives in `~/.skillward/skillward.lock` and
+  hook scripts), `~/.claude.json` and the other agents' user files (section 5), without walking a project. Some agents
+  rewrite their settings for UI changes (Gemini CLI's `settings.json` on `/theme`, `/auth`), so `verify --global` can
+  report changes that aren't about tools or servers. State lives in `~/.skillward/skillward.lock` and
   `~/.skillward/snapshots/` — outside `~/.claude`, which is what is locked. `~/.claude.json` is rewritten constantly
   (history, counters, per-project state), so only its MCP servers are locked: the `mcpServers` sections as canonical
   JSON (keys sorted, projects without servers left out); that text is what is hashed, snapshotted and diffed.
@@ -602,5 +620,10 @@ fourth needs a rescan of the affected repositories):
 - [x] **SW016 secret-in-config.**
 - [x] **Hook targets** scanned and locked with their hook file; **SW017 hook-script**.
 - [x] **Other agents:** Cursor, GitHub Copilot / VS Code, Gemini CLI, Windsurf, Cline, Kiro (project-level files).
-- [ ] **Other agents, global:** `~/.cursor`, `~/.gemini`, Windsurf/Cline user MCP configs in `--global`.
+- [x] **Other agents, global:** Cursor, Gemini CLI (with extensions), Windsurf, Cline, Kiro and Codex user
+  configuration in `--global`; SW012 reads Windsurf `serverUrl` and Gemini `httpUrl`.
+- [ ] **Other agents, next:** Cline hooks (`~/Documents/Cline/Hooks`, `.clinerules/hooks`: scripts that run
+  automatically); Gemini `settings.json` as `settings` (it can carry hooks and tool allowlists, so SW013/SW008 should
+  run on it — changes the project level too); Gemini `contextFileName`; Codex `config.toml` MCP servers (needs TOML);
+  Cline `autoApprove` and Gemini `trust: true` on MCP servers.
 - [ ] **v0.2 sandbox:** container, proxy, honeytokens, agent run, tool-call logging, verdicts, report.

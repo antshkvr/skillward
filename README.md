@@ -34,7 +34,7 @@ npx skillward explain path/to/their-repo --untrusted
 
 `--untrusted` makes sure the repository's own `skillward.config.json`, `skillward-ignore` comments and `.gitignore` can't hide anything. Run it before you start an agent there: once a session starts, the agent has already read the repository's `CLAUDE.md`.
 
-**Pin your own setup** — `~/.claude` and the MCP servers in `~/.claude.json` — and get told when it changes:
+**Pin your own setup** — `~/.claude`, the MCP servers in `~/.claude.json`, and Cursor, Gemini CLI, Windsurf, Cline, Kiro and Codex user config — and get told when it changes:
 
 ```sh
 npm install -g skillward
@@ -76,7 +76,7 @@ Found a security bug in skillward itself? Please report it privately — see [SE
 npx skillward scan                 # current directory
 npx skillward scan path/to/project
 npx skillward scan .claude/skills/pdf/SKILL.md   # one skill
-npx skillward scan --global        # also ~/.claude and the MCP servers in ~/.claude.json
+npx skillward scan --global        # also ~/.claude, ~/.claude.json MCP servers, other agents' user config
 npx skillward scan --format sarif --output skillward.sarif
 npx skillward scan --fail-on medium
 
@@ -94,7 +94,7 @@ npx skillward rules                # list rules
 
 | Option | Default | |
 |---|---|---|
-| `--global` | off | Also scan `~/.claude` (`CLAUDE.md`, `settings*.json`, `skills/`, `agents/`, `commands/`, `plugins/`) and the `mcpServers` sections of `~/.claude.json` (its history is never read) |
+| `--global` | off | Also scan your user-level agent configuration: `~/.claude` (`CLAUDE.md`, `settings*.json`, `skills/`, `agents/`, `commands/`, `plugins/`), the `mcpServers` sections of `~/.claude.json` (its history is never read), and Cursor, Gemini CLI, Windsurf, Cline, Kiro and Codex user files (see [What gets scanned](#what-gets-scanned)) |
 | `--format text\|json\|sarif` | `text` | Output format |
 | `--output <file>` | stdout | Write the report to a file |
 | `--fail-on info\|low\|medium\|high` | `high` | Lowest severity that makes the exit code `1` |
@@ -153,7 +153,7 @@ Capabilities: runs code from the internet · gives a remote host control · turn
 
 Diffs and snapshots never contain secrets: provider tokens, secret-looking values of secret-named keys, JWTs and private keys are masked to their first 4 characters and length (`ghp_…[40 chars]`), as in findings.
 
-**Your own configuration.** `lock --global` pins what applies to every project — `~/.claude` (`CLAUDE.md`, settings, skills, agents, commands, plugins, the scripts hooks run) and the MCP servers in `~/.claude.json` — in `~/.skillward/skillward.lock`, with snapshots in `~/.skillward/snapshots/`. `verify --global` then shows what changed since: a plugin that updated itself, an MCP server a tool added, an edited hook script. Of `~/.claude.json` only the `mcpServers` sections are locked, so history and counters don't count as drift. `--global` takes no path and reads no project config. The lock lives on the same machine as what it pins: it catches changes made by updates and tools, not by someone who can also rewrite `~/.skillward`. To run it on every Claude Code start, see the `SessionStart` hook in [Quick start](#quick-start).
+**Your own configuration.** `lock --global` pins what applies to every project — `~/.claude` (`CLAUDE.md`, settings, skills, agents, commands, plugins, the scripts hooks run), the MCP servers in `~/.claude.json`, and the other agents' user files `scan --global` reads — in `~/.skillward/skillward.lock`, with snapshots in `~/.skillward/snapshots/`. `verify --global` then shows what changed since: a plugin that updated itself, an MCP server a tool added, an edited hook script. Of `~/.claude.json` only the `mcpServers` sections are locked, so history and counters don't count as drift. `--global` takes no path and reads no project config. The lock lives on the same machine as what it pins: it catches changes made by updates and tools, not by someone who can also rewrite `~/.skillward`. To run it on every Claude Code start, see the `SessionStart` hook in [Quick start](#quick-start).
 
 ## What gets scanned
 
@@ -171,11 +171,22 @@ Other agents, with the same rules:
 |---|---|
 | Cursor | `.cursorrules`, `.cursor/rules/**/*.mdc`, `.cursor/commands/*.md`, `.cursor/mcp.json`, `.cursor/hooks.json` (and the scripts its hooks run) |
 | GitHub Copilot / VS Code | `.github/copilot-instructions.md`, `.github/instructions/*.instructions.md`, `.github/prompts/*.prompt.md`, `.github/chatmodes/*.chatmode.md`, `.github/agents/*.agent.md`, `.vscode/mcp.json` |
-| Gemini CLI | `GEMINI.md`, `.gemini/settings.json` (MCP servers), `.gemini/commands/**/*.toml` |
+| Gemini CLI | `GEMINI.md`, `.gemini/settings.json` (MCP servers), `.gemini/commands/**/*.toml`, extensions in `.gemini/extensions/*/` (`gemini-extension.json` MCP servers, `GEMINI.md`, `commands/`) |
 | Windsurf | `.windsurfrules`, `.windsurf/rules/*.md`, `.windsurf/workflows/*.md` |
 | Cline | `.clinerules` (file or folder) |
 | Kiro | `.kiro/steering/*.md`, `.kiro/settings/mcp.json` |
 | Codex, others | `AGENTS.md`; skills in any folder with a `SKILL.md` (`.agents/skills`, `.codex/skills`, `.cursor/skills`, …) |
+
+With `--global`, the same agents' user-level configuration, and only these paths in the home directory:
+
+| Agent | Files |
+|---|---|
+| Claude Code | `~/.claude` (`CLAUDE.md`, `settings*.json`, `skills/`, `agents/`, `commands/`, `plugins/`), the `mcpServers` sections of `~/.claude.json` |
+| Cursor | `~/.cursor/mcp.json`, `~/.cursor/hooks.json` (hook scripts resolve from `~/.cursor/`), `~/.cursor/commands/`, `~/.cursor/skills/` |
+| Gemini CLI | `~/.gemini/settings.json`, `~/.gemini/GEMINI.md`, `~/.gemini/commands/`, `~/.gemini/extensions/` |
+| Windsurf | `~/.codeium/windsurf/mcp_config.json`, `memories/global_rules.md`, `global_workflows/` |
+| Cline | `~/.cline/data/settings/cline_mcp_settings.json` (and the older copy in VS Code's `globalStorage/saoudrizwan.claude-dev/settings/`), `~/.cline/rules/`, `~/.cline/workflows/`, `~/.cline/skills/`, `~/Documents/Cline/Rules/` and `Workflows/` |
+| Kiro, Codex, shared | `~/.kiro/settings/mcp.json`, `~/.kiro/steering/`; `~/.codex/AGENTS.md`, `~/.codex/skills/`; `~/.agents/AGENTS.md`, `~/.agents/skills/` |
 
 Scripts that hooks run (`node .github/setup.js`, `"$CLAUDE_PROJECT_DIR"/.claude/hooks/check.sh`, `${CLAUDE_PLUGIN_ROOT}/hooks/run.sh`) are added to the hook file's target when they live inside the scanned folder (a script inside a skill folder stays in the skill): their content is scanned, `lock` pins them, and SW017 flags the ones that can't be reviewed.
 

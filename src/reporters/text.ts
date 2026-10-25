@@ -93,7 +93,7 @@ export const textReporter: Reporter = ({ result, failOn, color, config, width })
     out.push(
       c.yellow(`No agent configuration found under ${escapeInvisible(result.root)}.`),
       c.dim(
-        "Looked for skills (folders with SKILL.md), CLAUDE.md / AGENTS.md / GEMINI.md, .claude/, .mcp.json, plugins, and Cursor, Copilot, Windsurf, Cline and Kiro rules. Use --global to include ~/.claude.",
+        "Looked for skills (folders with SKILL.md), CLAUDE.md / AGENTS.md / GEMINI.md, .claude/, .mcp.json, plugins, and Cursor, Copilot, Windsurf, Cline and Kiro rules. Use --global to include your user-level configuration (~/.claude, ~/.cursor, ~/.gemini, …).",
       ),
     );
   } else if (result.findings.length === 0) {

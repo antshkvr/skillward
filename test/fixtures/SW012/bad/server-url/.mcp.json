@@ -1,0 +1,7 @@
+{
+  "mcpServers": {
+    "docs": {
+      "serverUrl": "https://mcp.example.invalid/sse"
+    }
+  }
+}

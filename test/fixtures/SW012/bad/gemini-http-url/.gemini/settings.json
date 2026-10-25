@@ -1,0 +1,11 @@
+{
+  "theme": "Default",
+  "mcpServers": {
+    "search": {
+      "httpUrl": "https://mcp.example.invalid/mcp",
+      "headers": {
+        "Authorization": "Bearer FAKE_KEY_abc123"
+      }
+    }
+  }
+}

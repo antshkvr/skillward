@@ -37,7 +37,7 @@ export async function hookScriptPaths(file: string, scanRoot: string, home?: str
   } catch {
     return [];
   }
-  const base = baseDirFor(file);
+  const base = baseDirFor(file, home);
   const out: HookTarget[] = [];
   for (const { event, command } of commandsOf(value)) {
     const path = scriptPath(command, base, home);
@@ -50,8 +50,10 @@ export async function hookScriptPaths(file: string, scanRoot: string, home?: str
 }
 
 /** `<project>/.claude/settings.json` → `<project>`; `<plugin>/hooks/hooks.json` and `.claude-plugin/plugin.json` → `<plugin>`. */
-function baseDirFor(file: string): string {
+function baseDirFor(file: string, home?: string): string {
   const dir = dirname(file);
+  // Cursor runs user hooks (`~/.cursor/hooks.json`) from `~/.cursor`.
+  if (home !== undefined && dir === resolve(home, ".cursor")) return dir;
   const name = dir.split(sep).pop();
   // Cursor runs project hooks from the project root too (`.cursor/hooks/x.sh` paths).
   return name === ".claude" || name === "hooks" || name === ".claude-plugin" || name === ".cursor" ? dirname(dir) : dir;

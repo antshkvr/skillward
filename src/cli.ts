@@ -98,7 +98,7 @@ export async function run(argv: string[], io: CliIO = defaultIO): Promise<number
       .command("scan")
       .description("scan a project (default: current directory) for dangerous agent instructions")
       .argument("[path]", "file or directory to scan", ".")
-      .option("--global", "also scan ~/.claude and the MCP servers in ~/.claude.json")
+      .option("--global", "also scan your user-level agent configuration (~/.claude, ~/.claude.json MCP servers, Cursor, Gemini CLI, Windsurf, Cline, Kiro, Codex)")
       .option("--untrusted", UNTRUSTED_HELP)
       .option("--files-from <file>", "only report findings in the files listed in <file> (one path per line, relative to the current directory); used for pull requests")
       .option("--baseline <file>", "report only findings that are not in this baseline (known findings are listed separately)")
@@ -114,7 +114,7 @@ export async function run(argv: string[], io: CliIO = defaultIO): Promise<number
     .argument("[path]", "file or directory to explain", ".")
     .addOption(new Option("--format <format>", "output format").choices(["text", "json"]).default("text"))
     .option("--output <file>", "write the report to a file instead of stdout")
-    .option("--global", "also explain ~/.claude and the MCP servers in ~/.claude.json")
+    .option("--global", "also explain your user-level agent configuration (~/.claude, ~/.claude.json MCP servers, Cursor, Gemini CLI, Windsurf, Cline, Kiro, Codex)")
     .option("--all", "also list targets with nothing notable")
     .option("--untrusted", UNTRUSTED_HELP)
     .option("--config <file>", `config file (default: skillward.config.json in the scan root)`)
@@ -128,7 +128,7 @@ export async function run(argv: string[], io: CliIO = defaultIO): Promise<number
     .command("lock")
     .description(`create or update ${LOCK_FILE_NAME} with hashes of all agent instruction files`)
     .argument("[path]", "project directory (default: current directory)")
-    .option("--global", `lock ~/.claude and the MCP servers in ~/.claude.json instead, in ~/${GLOBAL_STATE_DIR}/${LOCK_FILE_NAME}`)
+    .option("--global", `lock your user-level agent configuration (~/.claude, ~/.claude.json MCP servers, Cursor, Gemini CLI, Windsurf, Cline, Kiro, Codex) instead, in ~/${GLOBAL_STATE_DIR}/${LOCK_FILE_NAME}`)
     .option("--config <file>", `config file (default: skillward.config.json in the project)`)
     .option("--no-snapshots", "do not keep copies of locked files in .skillward/snapshots (verify then can't show diffs)")
     .option("--no-color", "disable colors")
@@ -154,7 +154,7 @@ export async function run(argv: string[], io: CliIO = defaultIO): Promise<number
       .command("verify")
       .description(`compare agent instruction files with ${LOCK_FILE_NAME}, show the diff and scan what changed`)
       .argument("[path]", "project directory (default: current directory)")
-      .option("--global", `compare ~/.claude and the MCP servers in ~/.claude.json with ~/${GLOBAL_STATE_DIR}/${LOCK_FILE_NAME}`),
+      .option("--global", `compare your user-level agent configuration (~/.claude, ~/.claude.json MCP servers, Cursor, Gemini CLI, Windsurf, Cline, Kiro, Codex) with ~/${GLOBAL_STATE_DIR}/${LOCK_FILE_NAME}`),
     ["text", "json"],
   ).action(async (path: string | undefined, flags: CommonFlags & { global?: boolean }) => {
     exitCode = await guard(io, () => runVerify(path, flags, io));
@@ -269,7 +269,7 @@ async function runExplain(path: string, flags: ExplainFlags, io: CliIO): Promise
  * lock and verify say what it changes, like scan does.
  */
 async function lockScope(path: string | undefined, flags: { config?: string; global?: boolean }): Promise<{ root: string; info: ConfigInfo }> {
-  if (path !== undefined && flags.global) throw new ConfigError("--global locks ~/.claude; don't pass a path with it");
+  if (path !== undefined && flags.global) throw new ConfigError("--global locks your user-level configuration; don't pass a path with it");
   const root = flags.global ? resolve(".") : await requireDirectory(path ?? ".");
   const loaded = await loadConfig({ configPath: flags.config, ...(flags.global ? {} : { root }) });
   return { root, info: { config: loaded.config, untrusted: false, ...(loaded.path ? { path: loaded.path } : {}) } };

@@ -41,8 +41,46 @@ const AGENT_DIRS = new Set([".claude", ".claude-plugin", ".cursor", ".windsurf",
 const INSTRUCTION_FILES = new Set(["CLAUDE.md", "CLAUDE.local.md", "AGENTS.md", "GEMINI.md", ".cursorrules", ".windsurfrules", ".clinerules"]);
 const GITIGNORE_EXEMPT_FILES = new Set([...INSTRUCTION_FILES, ".mcp.json"]);
 
-/** What `--global` looks at inside `~/.claude`; the rest (transcripts, caches, todos) is not agent config. */
-const GLOBAL_ENTRIES = new Set(["CLAUDE.md", "settings.json", "settings.local.json", "skills", "agents", "commands", "plugins"]);
+/**
+ * User-level agent configuration `--global` reads (SPEC section 5): a folder under the home directory and the only
+ * top-level entries walked in it — the rest (transcripts, caches, credentials, task history) is not agent config.
+ * `kinds` classifies paths, relative to the folder, that `classifyFile` doesn't know.
+ */
+interface GlobalSource {
+  dir: string;
+  entries: string[];
+  kinds?: Array<[RegExp, TargetKind]>;
+}
+
+const CLINE_MCP: Pick<GlobalSource, "entries" | "kinds"> = { entries: ["cline_mcp_settings.json"], kinds: [[/^cline_mcp_settings\.json$/, "mcp-config"]] };
+
+const GLOBAL_SOURCES: GlobalSource[] = [
+  { dir: ".claude", entries: ["CLAUDE.md", "settings.json", "settings.local.json", "skills", "agents", "commands", "plugins"] },
+  { dir: ".cursor", entries: ["mcp.json", "hooks.json", "commands", "skills"] },
+  { dir: ".gemini", entries: ["settings.json", "GEMINI.md", "commands", "extensions"] },
+  {
+    dir: ".codeium/windsurf",
+    entries: ["mcp_config.json", "memories", "global_workflows"],
+    kinds: [[/^mcp_config\.json$/, "mcp-config"], [/^memories\/global_rules\.md$/, "instructions"], [/^global_workflows\/.+\.md$/, "instructions"]],
+  },
+  { dir: ".cline/data/settings", ...CLINE_MCP },
+  // Older Cline versions kept MCP servers in the VS Code extension's storage (Windows, macOS, Linux).
+  ...["AppData/Roaming/Code", "Library/Application Support/Code", ".config/Code"].map((app) => ({
+    dir: `${app}/User/globalStorage/saoudrizwan.claude-dev/settings`,
+    ...CLINE_MCP,
+  })),
+  { dir: ".cline", entries: ["rules", "workflows", "skills"], kinds: [[/^(?:rules|workflows)\/.+\.md$/, "instructions"]] },
+  { dir: "Documents/Cline", entries: ["Rules", "Workflows"], kinds: [[/^(?:Rules|Workflows)\/.+\.md$/, "instructions"]] },
+  { dir: ".agents", entries: ["AGENTS.md", "skills"] },
+  { dir: ".kiro", entries: ["settings", "steering"] },
+  { dir: ".codex", entries: ["AGENTS.md", "skills"] },
+];
+
+/** A folder global files came from: hook scripts of its files resolve inside it and display under its prefix. */
+interface GlobalScope {
+  abs: string;
+  display: string;
+}
 
 interface WalkedFile extends SourceFile {
   /** Absolute path with forward slashes, used for classification. */
@@ -84,15 +122,21 @@ export async function discover(options: DiscoveryOptions): Promise<DiscoveryResu
     throw new DiscoveryError(`not a file or directory: ${options.path}`);
   }
 
+  const globalScopes: GlobalScope[] = [];
   if (options.global || options.globalOnly) {
     const home = options.homeDir ?? homedir();
     // Avoid scanning the same files twice when the project root already contains ~/.claude.
     const seen = new Set(targets.flatMap((t) => t.files.map((f) => f.absPath)));
-    const claudeDir = join(home, ".claude");
-    const exists = await lstat(claudeDir).then((s) => s.isDirectory(), () => false);
-    if (exists) {
-      const files = await walk(claudeDir, { displayPrefix: "~/.claude", topLevel: GLOBAL_ENTRIES }, skipped);
-      targets.push(...classify(files.filter((f) => !seen.has(f.absPath)), skipped));
+    for (const source of GLOBAL_SOURCES) {
+      const dir = join(home, source.dir);
+      const exists = await lstat(dir).then((s) => s.isDirectory(), () => false);
+      if (!exists) continue;
+      const display = `~/${source.dir}`;
+      const files = await walk(dir, { displayPrefix: display, topLevel: new Set(source.entries) }, skipped);
+      const prefix = dir.split(sep).join("/") + "/";
+      const kindOf = (file: WalkedFile) => source.kinds?.find(([re]) => re.test(file.classifyPath.slice(prefix.length)))?.[1];
+      targets.push(...classify(files.filter((f) => !seen.has(f.absPath)), skipped, kindOf));
+      globalScopes.push({ abs: dir, display });
     }
     // User- and project-scoped MCP servers live in ~/.claude.json (next to history, which is not scanned).
     const claudeJson = join(home, ".claude.json");
@@ -102,7 +146,7 @@ export async function discover(options: DiscoveryOptions): Promise<DiscoveryResu
     }
   }
 
-  await attachHookTargets(targets, root, options.global || options.globalOnly ? join(options.homeDir ?? homedir(), ".claude") : undefined, options.homeDir ?? homedir());
+  await attachHookTargets(targets, root, globalScopes, options.homeDir ?? homedir());
 
   targets.sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0));
   return { root, targets, skipped };
@@ -115,7 +159,7 @@ export const HOOK_FILE = /(?:^|\/)(?:\.claude\/settings(?:\.local)?\.json|hooks\
  * Adds the local scripts that hooks run to the hook file's target (see SPEC, "Hook targets"), so their content is
  * scanned and locked. A script already in a target is left where it is; in a skill it is marked as a hook target there.
  */
-async function attachHookTargets(targets: Target[], root: string, globalClaudeDir: string | undefined, home: string): Promise<void> {
+async function attachHookTargets(targets: Target[], root: string, globalScopes: GlobalScope[], home: string): Promise<void> {
   const owned = new Set(targets.flatMap((t) => t.files.map((f) => f.absPath)));
   const inSkills = new Map(targets.filter((t) => t.kind === "skill").flatMap((t) => t.files.map((f) => [f.absPath, f] as const)));
   for (const target of targets) {
@@ -123,8 +167,8 @@ async function attachHookTargets(targets: Target[], root: string, globalClaudeDi
     for (const file of [...target.files]) {
       const forward = file.absPath.split(sep).join("/");
       if (!HOOK_FILE.test(forward)) continue;
-      const global = globalClaudeDir !== undefined && file.path.startsWith("~/");
-      const scope = global ? globalClaudeDir! : root;
+      const global = file.path.startsWith("~/") ? globalScopes.find((s) => file.absPath.startsWith(s.abs + sep)) : undefined;
+      const scope = global ? global.abs : root;
       const added = new Map<string, SourceFile>();
       for (const hook of await hookTargets(file.absPath, scope, home)) {
         const existing = added.get(hook.absPath);
@@ -142,7 +186,7 @@ async function attachHookTargets(targets: Target[], root: string, globalClaudeDi
         const rel = relative(scope, hook.absPath).split(sep).join("/");
         const source: SourceFile = {
           absPath: hook.absPath,
-          path: global ? `~/.claude/${rel}` : rel,
+          path: global ? `${global.display}/${rel}` : rel,
           hookTarget: { events: [hook.event], from: file.path },
         };
         added.set(hook.absPath, source);
@@ -235,7 +279,7 @@ function toWalked(abs: string, display: string, symlink: boolean): WalkedFile {
 const CONFIG_KINDS = new Set<TargetKind>(["settings", "mcp-config", "plugin-manifest"]);
 
 /** Groups walked files into targets. Files that are not agent configuration are dropped. */
-function classify(files: WalkedFile[], skipped: SkippedFile[]): Target[] {
+function classify(files: WalkedFile[], skipped: SkippedFile[], kindOf?: (file: WalkedFile) => TargetKind | undefined): Target[] {
   const isSkillFile = (f: WalkedFile) => !f.symlink && f.classifyPath.endsWith("/SKILL.md");
   const skillRoots = files
     .filter(isSkillFile)
@@ -250,7 +294,7 @@ function classify(files: WalkedFile[], skipped: SkippedFile[]): Target[] {
   const targets: Target[] = [];
 
   for (const file of files) {
-    const own = classifyFile(file.classifyPath, pluginRoots);
+    const own = kindOf?.(file) ?? classifyFile(file.classifyPath, pluginRoots);
     // Settings, MCP configs and plugin manifests are loaded by the agent wherever they sit, even in a skill folder.
     const skill = own && CONFIG_KINDS.has(own) ? undefined : skillRoots.find((s) => file.classifyPath.startsWith(s.dir + "/"));
     const kind: TargetKind | undefined = skill ? "skill" : own;
@@ -293,6 +337,7 @@ const OTHER_AGENT_INSTRUCTIONS = [
   /\/\.clinerules\/.+\.md$/,
   /\/\.kiro\/steering\/.+\.md$/,
   /\/\.gemini\/commands\/.+\.toml$/,
+  /\/\.gemini\/extensions\/[^/]+\/commands\/.+\.toml$/,
 ];
 
 /** Target kind of a standalone file, by its absolute forward-slash path. */
@@ -302,6 +347,8 @@ export function classifyFile(path: string, pluginRoots: string[]): TargetKind | 
   if (/\/\.claude\/(commands|agents)\/.+\.md$/.test(path)) return "instructions";
   if (OTHER_AGENT_INSTRUCTIONS.some((re) => re.test(path))) return "instructions";
   if (/\/\.(?:cursor|vscode)\/mcp\.json$|\/\.gemini\/settings\.json$|\/\.kiro\/settings\/mcp\.json$/.test(path)) return "mcp-config";
+  // Gemini CLI extensions are installable third-party packages that bring their own MCP servers.
+  if (/\/\.gemini\/extensions\/[^/]+\/gemini-extension\.json$/.test(path)) return "mcp-config";
   if (/\/\.cursor\/hooks\.json$/.test(path)) return "settings";
   if (name === ".mcp.json" || name === ".claude.json") return "mcp-config";
   if (/\/\.claude\/settings(\.local)?\.json$/.test(path)) return "settings";

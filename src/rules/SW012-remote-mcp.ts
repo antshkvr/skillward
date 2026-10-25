@@ -14,7 +14,7 @@ const rule: Rule = {
   severity: "low",
   appliesTo: ["mcp-config", "settings", "plugin-manifest"],
   description:
-    "Inventory of MCP servers reached over the network (`url`, type http/sse): which hosts get your tool calls. Plain http:// to a non-local host, or credentials in the URL, raise it to medium.",
+    "Inventory of MCP servers reached over the network (`url`, `serverUrl`, `httpUrl`; type http/sse): which hosts get your tool calls. Plain http:// to a non-local host, or credentials in the URL, raise it to medium.",
   check(target) {
     return target.files.flatMap((file) => (file.type === "json" ? checkFile(file) : []));
   },
@@ -25,7 +25,8 @@ export default rule;
 function checkFile(file: ParsedFile): Finding[] {
   const findings: Finding[] = [];
   for (const server of mcpServers(file)) {
-    const urlNode = member(server.config, "url");
+    // Windsurf names it `serverUrl`, Gemini CLI `httpUrl` (streamable HTTP).
+    const urlNode = member(server.config, "url") ?? member(server.config, "serverUrl") ?? member(server.config, "httpUrl");
     const raw = stringValue(urlNode);
     // An empty `url` is a placeholder the user fills in (plugin templates); nothing is contacted.
     if (!urlNode || raw === undefined || raw.trim() === "") continue;
