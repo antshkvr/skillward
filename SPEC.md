@@ -127,7 +127,9 @@ discovery  →  parsers  →  rule engine  →  reporters
 
 - **discovery** finds targets and classifies them:
   - `skill`: a folder with `SKILL.md` and every file inside (scripts, templates, references); a file belongs to its
-    nearest nested skill;
+    nearest nested skill. Settings, MCP configs and plugin manifests are the exception: the agent loads them wherever
+    they sit (a repository with `SKILL.md` at its root still has live `.claude/settings.json` and `.mcp.json`), so they
+    are targets of their own kind even inside a skill folder;
   - `instructions`: `CLAUDE.md`, `CLAUDE.local.md`, `AGENTS.md` (at any depth), `.claude/commands/**/*.md`,
     `.claude/agents/**/*.md`, and `commands/**/*.md`, `agents/**/*.md` at a plugin root (a folder with
     `.claude-plugin/plugin.json`);
@@ -164,7 +166,9 @@ discovery  →  parsers  →  rule engine  →  reporters
     (`node .github/setup.js`, `"${CLAUDE_PROJECT_DIR}"/.claude/hooks/x.sh`, `${CLAUDE_PLUGIN_ROOT}/hooks/run.sh`, `bash
     scripts/x.sh`) adds that script to the same target: every rule scans its content, `lock` pins it, `explain` counts it.
     The path is resolved against the project (the folder holding `.claude/`) or the plugin root, must stay inside the
-    scan root, is never a symlink, and a file already in another target isn't added twice. Hook targets are read even
+    scan root, is never a symlink, and a file already in another target isn't added twice; a script that belongs to a
+    skill stays in the skill (under its skill-relative name in the lockfile) and is marked as a hook target there, so
+    SW017 still checks it. Hook targets are read even
     when large or binary, to describe them (size, longest line, binary, obfuscation signals) for SW017; their content
     is scanned only if it fits the usual 2 MB text limit. Gitignore doesn't hide a referenced script.
 - **parsers** — markdown: frontmatter, body, extracted code blocks and HTML comments; JSON: a tree; scripts: text plus
@@ -560,14 +564,18 @@ random sample of 60 high findings: ~85% point at a genuinely dangerous pattern (
 security skills). Copies of the ClawHavoc malware campaign (fake "prerequisite" with a password-protected archive or a
 paste-site command) are still redistributed in GitHub mirrors months after the registry removed them.
 
-**Known gaps, to fix before publishing numbers** (the fetch now covers the first two: a 25,000-file cap and the scripts
-hook commands name; the rerun is pending):
+**Known gaps, to fix before publishing numbers** (the 2026-10-24 rerun with 0.1.3 covers the first three: a 25,000-file
+cap, the scripts hook commands name, and an isolated Linux environment where antivirus doesn't touch checkouts; the
+fourth needs a rescan of the affected repositories):
 - A cap of 1,500 files per repository truncated 193 large collections (~1.8M files not fetched).
 - The fetch selects agent files only, so scripts that hooks run (`.claude/hooks/*`, plugin `hooks/*`, `.github/*.js`) are
   missing: hook targets and SW017 can't be measured on this corpus. The rerun must add hook directories and the files
   hook commands name.
 - Antivirus on the scanning machine removed the most malicious files on checkout, so the scan never saw them. Run the
   corpus on a machine without real-time antivirus interference (a VM), and report antivirus detections separately.
+- Up to 0.1.3, discovery put settings, MCP configs and plugin manifests inside a skill folder into the skill, so SW011,
+  SW012 and SW017 skipped them: in the rerun, 1,157 such files in 134 repositories (41 with `SKILL.md` at the
+  root). Rescan those repositories with 0.1.4.
 
 ## 12. Later: team edition (not before there are users)
 

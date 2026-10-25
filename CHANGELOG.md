@@ -6,6 +6,7 @@
 
 - SW002: a hidden HTML comment that tells the agent to read secrets and send them out, or to hide what it does from the user, is `high` (was `medium`). Comments that only describe such an attack, or warn against it, are unchanged.
 - SW009: "don't mention this step to the user" is `high`, like "don't tell the user"; not mentioning a step is no longer described as keeping instructions secret.
+- Discovery: `.claude/settings.json`, `.mcp.json`, plugin manifests and plugin `hooks/hooks.json` inside a skill folder are targets of their own kind, not files of the skill. A repository with `SKILL.md` at its root has live project settings and MCP servers, and SW011, SW012 and SW017 skipped them (found while checking the corpus: 1,157 files in 134 of 2,910 repositories). A hook script that lives in a skill folder stays in the skill and is now checked by SW017. In lockfiles of such repositories, `verify` reports these files as removed from the skill and added as new targets, and scans them; run `lock` to accept.
 
 ## 0.1.3 — 2026-10-23
 

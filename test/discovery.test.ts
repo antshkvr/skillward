@@ -113,6 +113,27 @@ describe("discovery", () => {
     expect(summary(result.targets)).toEqual([{ kind: "skill", path: "x", files: ["x/SKILL.md"] }]);
   });
 
+  it("keeps settings, MCP configs and plugin manifests inside a skill folder as their own targets", async () => {
+    // A repository that is itself a skill (SKILL.md at the root) still has live project settings and MCP servers.
+    const root = tree({
+      "SKILL.md": "---\nname: root\n---\n",
+      "scripts/run.sh": "echo run\n",
+      ".claude/settings.json": "{}",
+      ".mcp.json": "{}",
+      ".claude-plugin/plugin.json": "{}",
+      "hooks/hooks.json": "{}",
+      "commands/hello.md": "# stays in the skill",
+    });
+    const result = await discover({ path: root });
+    expect(summary(result.targets)).toEqual([
+      { kind: "skill", path: ".", files: ["SKILL.md", "commands/hello.md", "scripts/run.sh"] },
+      { kind: "plugin-manifest", path: ".claude-plugin/plugin.json", files: [".claude-plugin/plugin.json"] },
+      { kind: "settings", path: ".claude/settings.json", files: [".claude/settings.json"] },
+      { kind: "mcp-config", path: ".mcp.json", files: [".mcp.json"] },
+      { kind: "settings", path: "hooks/hooks.json", files: ["hooks/hooks.json"] },
+    ]);
+  });
+
   it("scans only agent config inside ~/.claude with --global", async () => {
     const home = tree({
       ".claude/CLAUDE.md": "# global",

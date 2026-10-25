@@ -123,7 +123,7 @@ async function hashFile(absPath: string): Promise<string> {
 
 function fileKey(target: Target, displayPath: string, hookTarget: boolean): string {
   // Hook scripts can share a basename (two `run.sh` in different folders): keep their project-relative path.
-  if (hookTarget) return displayPath;
+  if (hookTarget && target.kind !== "skill") return displayPath;
   if (target.kind !== "skill") return posix.basename(displayPath);
   return target.path === "." ? displayPath : displayPath.slice(target.path.length + 1);
 }

@@ -135,6 +135,32 @@ describe("hook targets: scan, lock and SW017", () => {
     expect(result.findings[0]!.message).toContain("UserPromptSubmit");
   });
 
+  it("checks a hook script that lives in a skill folder where it is", async () => {
+    const root = tree({
+      "SKILL.md": "---\nname: root\n---\n",
+      ".claude/settings.json": settings("node .claude/hooks/start.js"),
+      ".claude/hooks/start.js": "var a=1;".repeat(3000),
+    });
+    const { targets } = await discover({ path: root });
+    const script = targets.find((t) => t.kind === "skill")!.files.find((f) => f.path === ".claude/hooks/start.js")!;
+    expect(script.hookTarget).toEqual({ events: ["SessionStart"], from: ".claude/settings.json" });
+    const result = await scan({ path: root, config: DEFAULT_CONFIG, rules: [SW017] });
+    expect(result.findings).toHaveLength(1);
+    expect(result.findings[0]).toMatchObject({ ruleId: "SW017", severity: "medium", file: ".claude/hooks/start.js" });
+  });
+
+  it("keeps a skill's hook script under its skill-relative name in the lockfile", async () => {
+    const root = tree({
+      ".claude/settings.json": settings("bash .claude/skills/x/run.sh"),
+      ".claude/skills/x/SKILL.md": "---\nname: x\n---\n",
+      ".claude/skills/x/run.sh": "echo skill\n",
+    });
+    await lock({ root, config: DEFAULT_CONFIG, snapshots: false });
+    const locked = JSON.parse(readFileSync(join(root, "skillward.lock"), "utf8"));
+    const entry = locked.entries.find((e: { kind: string }) => e.kind === "skill");
+    expect(Object.keys(entry.files).sort()).toEqual(["SKILL.md", "run.sh"]);
+  }, 30_000);
+
   it("describes a hook script over the text limit without scanning its content", async () => {
     const big = "var a=1;\n".repeat(260_000); // ~2.3 MB, readable lines
     const root = tree({ ".claude/settings.json": settings("node .github/big.js"), ".github/big.js": big });

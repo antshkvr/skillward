@@ -159,7 +159,7 @@ Diffs and snapshots never contain secrets: provider tokens, secret-looking value
 
 | Kind | Files |
 |---|---|
-| `skill` | A folder with `SKILL.md` and every file inside it (scripts, templates, references) |
+| `skill` | A folder with `SKILL.md` and every file inside it (scripts, templates, references), except the settings, MCP configs and plugin manifests below, which are always targets of their own |
 | `instructions` | `CLAUDE.md`, `CLAUDE.local.md`, `AGENTS.md` at any depth; `.claude/commands/**/*.md`, `.claude/agents/**/*.md`; `commands/` and `agents/` of plugins |
 | `mcp-config` | `.mcp.json`; with `--global`, the `mcpServers` sections of `~/.claude.json` |
 | `settings` | `.claude/settings.json`, `.claude/settings.local.json`, plugin `hooks/hooks.json` |
@@ -177,7 +177,7 @@ Other agents, with the same rules:
 | Kiro | `.kiro/steering/*.md`, `.kiro/settings/mcp.json` |
 | Codex, others | `AGENTS.md`; skills in any folder with a `SKILL.md` (`.agents/skills`, `.codex/skills`, `.cursor/skills`, …) |
 
-Scripts that hooks run (`node .github/setup.js`, `"$CLAUDE_PROJECT_DIR"/.claude/hooks/check.sh`, `${CLAUDE_PLUGIN_ROOT}/hooks/run.sh`) are added to the hook file's target when they live inside the scanned folder: their content is scanned, `lock` pins them, and SW017 flags the ones that can't be reviewed.
+Scripts that hooks run (`node .github/setup.js`, `"$CLAUDE_PROJECT_DIR"/.claude/hooks/check.sh`, `${CLAUDE_PLUGIN_ROOT}/hooks/run.sh`) are added to the hook file's target when they live inside the scanned folder (a script inside a skill folder stays in the skill): their content is scanned, `lock` pins them, and SW017 flags the ones that can't be reviewed.
 
 `.gitignore` files are respected — except for agent configuration (`.claude/`, `.claude-plugin/`, `CLAUDE*.md`, `AGENTS.md`, `.mcp.json`), which is often gitignored on purpose but still loaded by the agent. `node_modules`, VCS folders and `.skillward/` are never entered. Binary files and files over 2 MB are skipped and listed in the report.
 

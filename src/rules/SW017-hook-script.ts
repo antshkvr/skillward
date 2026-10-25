@@ -12,7 +12,7 @@ const rule: Rule = {
   id: "SW017",
   name: "hook-script",
   severity: "high",
-  appliesTo: ["settings", "plugin-manifest"],
+  appliesTo: ["settings", "plugin-manifest", "skill"],
   description:
     "A hook runs a script that can't be reviewed: obfuscated (javascript-obfuscator, packers, escape-encoded strings), a binary, over 1 MB, or minified into very long lines. Hooks run automatically, so this is code you run without reading.",
   check(target) {

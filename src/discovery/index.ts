@@ -113,10 +113,11 @@ export const HOOK_FILE = /(?:^|\/)(?:\.claude\/settings(?:\.local)?\.json|hooks\
 
 /**
  * Adds the local scripts that hooks run to the hook file's target (see SPEC, "Hook targets"), so their content is
- * scanned and locked. A script already in a target is left where it is.
+ * scanned and locked. A script already in a target is left where it is; in a skill it is marked as a hook target there.
  */
 async function attachHookTargets(targets: Target[], root: string, globalClaudeDir: string | undefined, home: string): Promise<void> {
   const owned = new Set(targets.flatMap((t) => t.files.map((f) => f.absPath)));
+  const inSkills = new Map(targets.filter((t) => t.kind === "skill").flatMap((t) => t.files.map((f) => [f.absPath, f] as const)));
   for (const target of targets) {
     if (target.kind !== "settings" && target.kind !== "plugin-manifest") continue;
     for (const file of [...target.files]) {
@@ -129,6 +130,12 @@ async function attachHookTargets(targets: Target[], root: string, globalClaudeDi
         const existing = added.get(hook.absPath);
         if (existing) {
           if (!existing.hookTarget!.events.includes(hook.event)) existing.hookTarget!.events.push(hook.event);
+          continue;
+        }
+        const skillFile = inSkills.get(hook.absPath);
+        if (skillFile && !skillFile.hookTarget) {
+          skillFile.hookTarget = { events: [hook.event], from: file.path };
+          added.set(hook.absPath, skillFile);
           continue;
         }
         if (owned.has(hook.absPath)) continue;
@@ -225,6 +232,8 @@ function toWalked(abs: string, display: string, symlink: boolean): WalkedFile {
   return { absPath: abs, path: display, classifyPath: abs.split(sep).join("/"), symlink };
 }
 
+const CONFIG_KINDS = new Set<TargetKind>(["settings", "mcp-config", "plugin-manifest"]);
+
 /** Groups walked files into targets. Files that are not agent configuration are dropped. */
 function classify(files: WalkedFile[], skipped: SkippedFile[]): Target[] {
   const isSkillFile = (f: WalkedFile) => !f.symlink && f.classifyPath.endsWith("/SKILL.md");
@@ -241,8 +250,10 @@ function classify(files: WalkedFile[], skipped: SkippedFile[]): Target[] {
   const targets: Target[] = [];
 
   for (const file of files) {
-    const skill = skillRoots.find((s) => file.classifyPath.startsWith(s.dir + "/"));
-    const kind: TargetKind | undefined = skill ? "skill" : classifyFile(file.classifyPath, pluginRoots);
+    const own = classifyFile(file.classifyPath, pluginRoots);
+    // Settings, MCP configs and plugin manifests are loaded by the agent wherever they sit, even in a skill folder.
+    const skill = own && CONFIG_KINDS.has(own) ? undefined : skillRoots.find((s) => file.classifyPath.startsWith(s.dir + "/"));
+    const kind: TargetKind | undefined = skill ? "skill" : own;
     if (!kind) continue;
     if (file.symlink) {
       skipped.push({ path: file.path, reason: "symbolic link (not followed)" });
