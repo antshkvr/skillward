@@ -49,6 +49,8 @@ describe("SW013 hook-command", () => {
     "powershell -NoProfile -ExecutionPolicy Bypass -File .claude/hooks/guard.ps1",
     "bash ${CLAUDE_SKILL_DIR}/bin/check-freeze.sh 2>/dev/null || true",
     '/usr/bin/python3 "$(git rev-parse --show-toplevel)/.codex/hooks/check_cmd.py"',
+    `'bun' "$GEMINI_PROJECT_DIR/.gemini/hooks/hud.ts"`,
+    '"$GEMINI_PROJECT_DIR/.gemini/hooks/check.sh" --event BeforeTool',
   ])("lists hooks that only start a shipped script as low: %s", (command) => {
     const [f] = check(hook(command));
     expect(f).toMatchObject({ severity: "low", confidence: "high" });

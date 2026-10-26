@@ -100,6 +100,10 @@ export async function discover(options: DiscoveryOptions): Promise<DiscoveryResu
   const targets: Target[] = [];
   const skipped: SkippedFile[] = [];
   let root: string;
+  const home = options.homeDir ?? homedir();
+  const global = options.global || options.globalOnly;
+  // Context file names from the user's Gemini settings count in every project.
+  const userContextNames = global ? await geminiContextNames([join(home, ".gemini", "settings.json")]) : [];
 
   if (options.globalOnly) {
     root = input;
@@ -117,14 +121,15 @@ export async function discover(options: DiscoveryOptions): Promise<DiscoveryResu
   } else if (inputStat.isDirectory()) {
     root = input;
     const files = await walk(root, { configIgnore: options.ignore ?? [], useGitignore: options.gitignore !== false }, skipped);
-    targets.push(...classify(files, skipped));
+    const projectSettings = files.filter((f) => !f.symlink && GEMINI_SETTINGS.test(f.classifyPath)).map((f) => f.absPath);
+    const names = new Set([...userContextNames, ...(await geminiContextNames(projectSettings))]);
+    targets.push(...classify(files, skipped, undefined, names));
   } else {
     throw new DiscoveryError(`not a file or directory: ${options.path}`);
   }
 
   const globalScopes: GlobalScope[] = [];
-  if (options.global || options.globalOnly) {
-    const home = options.homeDir ?? homedir();
+  if (global) {
     // Avoid scanning the same files twice when the project root already contains ~/.claude.
     const seen = new Set(targets.flatMap((t) => t.files.map((f) => f.absPath)));
     for (const source of GLOBAL_SOURCES) {
@@ -132,10 +137,12 @@ export async function discover(options: DiscoveryOptions): Promise<DiscoveryResu
       const exists = await lstat(dir).then((s) => s.isDirectory(), () => false);
       if (!exists) continue;
       const display = `~/${source.dir}`;
-      const files = await walk(dir, { displayPrefix: display, topLevel: new Set(source.entries) }, skipped);
+      // `~/.gemini/<name>` is the user's context file for each name in `context.fileName`.
+      const entries = source.dir === ".gemini" ? [...source.entries, ...userContextNames] : source.entries;
+      const files = await walk(dir, { displayPrefix: display, topLevel: new Set(entries) }, skipped);
       const prefix = dir.split(sep).join("/") + "/";
       const kindOf = (file: WalkedFile) => source.kinds?.find(([re]) => re.test(file.classifyPath.slice(prefix.length)))?.[1];
-      targets.push(...classify(files.filter((f) => !seen.has(f.absPath)), skipped, kindOf));
+      targets.push(...classify(files.filter((f) => !seen.has(f.absPath)), skipped, kindOf, new Set(userContextNames)));
       globalScopes.push({ abs: dir, display });
     }
     // User- and project-scoped MCP servers live in ~/.claude.json (next to history, which is not scanned).
@@ -146,14 +153,14 @@ export async function discover(options: DiscoveryOptions): Promise<DiscoveryResu
     }
   }
 
-  await attachHookTargets(targets, root, globalScopes, options.homeDir ?? homedir());
+  await attachHookTargets(targets, root, globalScopes, home);
 
   targets.sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0));
   return { root, targets, skipped };
 }
 
 /** Files whose `hooks` (and `statusLine`) commands can name local scripts; matched on forward-slash paths. */
-export const HOOK_FILE = /(?:^|\/)(?:\.claude\/settings(?:\.local)?\.json|hooks\/hooks\.json|\.claude-plugin\/plugin\.json|\.cursor\/hooks\.json|\.codex\/(?:hooks\.json|config\.toml))$/;
+export const HOOK_FILE = /(?:^|\/)(?:\.claude\/settings(?:\.local)?\.json|hooks\/hooks\.json|\.claude-plugin\/plugin\.json|\.cursor\/hooks\.json|\.codex\/(?:hooks\.json|config\.toml)|\.gemini\/settings\.json)$/;
 
 /**
  * Adds the local scripts that hooks run to the hook file's target (see SPEC, "Hook targets"), so their content is
@@ -279,7 +286,12 @@ function toWalked(abs: string, display: string, symlink: boolean): WalkedFile {
 const CONFIG_KINDS = new Set<TargetKind>(["settings", "mcp-config", "plugin-manifest"]);
 
 /** Groups walked files into targets. Files that are not agent configuration are dropped. */
-function classify(files: WalkedFile[], skipped: SkippedFile[], kindOf?: (file: WalkedFile) => TargetKind | undefined): Target[] {
+function classify(
+  files: WalkedFile[],
+  skipped: SkippedFile[],
+  kindOf?: (file: WalkedFile) => TargetKind | undefined,
+  contextNames: ReadonlySet<string> = new Set(),
+): Target[] {
   const isSkillFile = (f: WalkedFile) => !f.symlink && f.classifyPath.endsWith("/SKILL.md");
   const skillRoots = files
     .filter(isSkillFile)
@@ -294,7 +306,10 @@ function classify(files: WalkedFile[], skipped: SkippedFile[], kindOf?: (file: W
   const targets: Target[] = [];
 
   for (const file of files) {
-    const own = kindOf?.(file) ?? classifyFile(file.classifyPath, pluginRoots);
+    const own =
+      kindOf?.(file) ??
+      classifyFile(file.classifyPath, pluginRoots) ??
+      (contextNames.has(basename(file.classifyPath)) ? "instructions" : undefined);
     // Settings, MCP configs and plugin manifests are loaded by the agent wherever they sit, even in a skill folder.
     const skill = own && CONFIG_KINDS.has(own) ? undefined : skillRoots.find((s) => file.classifyPath.startsWith(s.dir + "/"));
     const kind: TargetKind | undefined = skill ? "skill" : own;
@@ -324,6 +339,36 @@ function parentDisplay(path: string): string {
   return idx === -1 ? "." : path.slice(0, idx);
 }
 
+const GEMINI_SETTINGS = /\/\.gemini\/settings\.json$/;
+/** At most this many context file names are taken from one settings file. */
+const MAX_CONTEXT_NAMES = 20;
+
+/**
+ * File names Gemini CLI loads as context, from `context.fileName` (or the older `contextFileName`): a name or a list.
+ * Only plain names count, not paths. Unreadable or invalid settings give none.
+ */
+async function geminiContextNames(settingsFiles: string[]): Promise<string[]> {
+  const names = new Set<string>();
+  for (const path of settingsFiles) {
+    let value: unknown;
+    try {
+      // A regular file only: links are never followed.
+      const stat = await lstat(path);
+      if (!stat.isFile() || stat.size > 2 * 1024 * 1024) continue;
+      value = JSON.parse(await readFile(path, "utf8"));
+    } catch {
+      continue;
+    }
+    const settings = value as { context?: { fileName?: unknown }; contextFileName?: unknown } | null;
+    const raw = settings?.context?.fileName ?? settings?.contextFileName;
+    const list = (Array.isArray(raw) ? raw : [raw]).filter((n): n is string => typeof n === "string");
+    for (const name of list.slice(0, MAX_CONTEXT_NAMES)) {
+      if (/^[^/\\]{1,255}$/.test(name) && name !== "." && name !== "..") names.add(name);
+    }
+  }
+  return [...names];
+}
+
 /** Instruction files of other agents, by path (see SPEC section 5, "Other agents"). */
 const OTHER_AGENT_INSTRUCTIONS = [
   /\/\.cursor\/rules\/.+\.(?:mdc|md)$/,
@@ -346,7 +391,9 @@ export function classifyFile(path: string, pluginRoots: string[]): TargetKind | 
   if (INSTRUCTION_FILES.has(name)) return "instructions";
   if (/\/\.claude\/(commands|agents)\/.+\.md$/.test(path)) return "instructions";
   if (OTHER_AGENT_INSTRUCTIONS.some((re) => re.test(path))) return "instructions";
-  if (/\/\.(?:cursor|vscode)\/mcp\.json$|\/\.gemini\/settings\.json$|\/\.kiro\/settings\/mcp\.json$/.test(path)) return "mcp-config";
+  if (/\/\.(?:cursor|vscode)\/mcp\.json$|\/\.kiro\/settings\/mcp\.json$/.test(path)) return "mcp-config";
+  // Gemini CLI settings carry hooks and tool allowlists next to MCP servers.
+  if (/\/\.gemini\/settings\.json$/.test(path)) return "settings";
   // Gemini CLI extensions are installable third-party packages that bring their own MCP servers.
   if (/\/\.gemini\/extensions\/[^/]+\/gemini-extension\.json$/.test(path)) return "mcp-config";
   if (/\/\.(?:cursor|codex)\/hooks\.json$|\/\.codex\/config\.toml$/.test(path)) return "settings";

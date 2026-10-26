@@ -56,10 +56,12 @@ export async function hookScriptPaths(file: string, scanRoot: string, home?: str
 function baseDirFor(file: string, home?: string): string {
   const dir = dirname(file);
   // Cursor runs user hooks (`~/.cursor/hooks.json`) from `~/.cursor`; relative paths in `~/.codex/hooks.json` are read there too.
-  if (home !== undefined && (dir === resolve(home, ".cursor") || dir === resolve(home, ".codex"))) return dir;
+  if (home !== undefined && [".cursor", ".codex", ".gemini"].some((d) => dir === resolve(home, d))) return dir;
   const name = dir.split(sep).pop();
-  // Cursor and Codex run project hooks from the project root (`.cursor/hooks/x.sh`, `.codex/hooks/x.py` paths).
-  return name === ".claude" || name === "hooks" || name === ".claude-plugin" || name === ".cursor" || name === ".codex" ? dirname(dir) : dir;
+  // Cursor, Codex and Gemini CLI run project hooks from the project root (`.cursor/hooks/x.sh`, `.codex/hooks/x.py`).
+  return name === ".claude" || name === "hooks" || name === ".claude-plugin" || name === ".cursor" || name === ".codex" || name === ".gemini"
+    ? dirname(dir)
+    : dir;
 }
 
 function commandsOf(value: unknown): Array<{ event: string; command: string }> {
@@ -102,7 +104,7 @@ export function scriptPath(command: string, base: string, home?: string): string
   for (const raw of words) {
     if (/^[A-Za-z_][A-Za-z0-9_]*=/.test(raw)) continue; // VAR=value
     let word = raw
-      .replace(/\$\{CLAUDE_PROJECT_DIR\}|\$CLAUDE_PROJECT_DIR\b|\$\{CLAUDE_PLUGIN_ROOT\}|\$CLAUDE_PLUGIN_ROOT\b/g, ".")
+      .replace(/\$\{(?:CLAUDE|GEMINI)_PROJECT_DIR\}|\$(?:CLAUDE|GEMINI)_PROJECT_DIR\b|\$\{CLAUDE_PLUGIN_ROOT\}|\$CLAUDE_PLUGIN_ROOT\b/g, ".")
       .replace(/^%CLAUDE_PROJECT_DIR%|^%CLAUDE_PLUGIN_ROOT%/i, ".");
     if (home) word = word.replace(/^(?:~|\$HOME|\$\{HOME\})(?=\/)/, home.split("\\").join("/"));
     if (word.startsWith("-") || /^\/[a-z]$/i.test(word)) continue; // options, incl. `cmd /c`

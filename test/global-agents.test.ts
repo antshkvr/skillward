@@ -86,7 +86,7 @@ describe("--global: other agents' user configuration", () => {
       "mcp-config ~/.gemini/extensions/ext/gemini-extension.json",
       "instructions ~/.gemini/extensions/ext/GEMINI.md",
       "instructions ~/.gemini/GEMINI.md",
-      "mcp-config ~/.gemini/settings.json",
+      "settings ~/.gemini/settings.json",
       "mcp-config ~/.kiro/settings/mcp.json",
       "instructions ~/.kiro/steering/product.md",
       `mcp-config ~/${CLINE_LEGACY}`,

@@ -134,7 +134,7 @@ const rule: Rule = {
   description:
     "Turning off approvals: --dangerously-skip-permissions, bypassPermissions mode, --yolo, unrestricted Bash allow rules, and instructions to skip confirmations or auto-approve (EN/RU).",
   check(target) {
-    return target.files.flatMap((file) => [...checkText(file), ...checkAllowList(file), ...checkCodexConfig(file)]);
+    return target.files.flatMap((file) => [...checkText(file), ...checkAllowList(file), ...checkCodexConfig(file), ...checkGeminiSettings(file)]);
   },
 };
 
@@ -312,6 +312,48 @@ function checkCodexConfig(file: ParsedFile): Finding[] {
       if (stringValue(toolMode) === "auto") {
         report(toolMode!, "low", `Tool "${key}" of MCP server "${server.name}" runs without asking (approval_mode = "auto"). Fine for read-only tools; check what it can change.`);
       }
+    }
+  }
+  return findings;
+}
+
+const GEMINI_FILE = /(?:^|\/)\.gemini\/(?:settings\.json$|extensions\/[^/]+\/gemini-extension\.json$)/;
+/** The whole shell tool: `run_shell_command` or `ShellTool`, without a command in parentheses. */
+const GEMINI_WHOLE_SHELL = /^(?:run_shell_command|ShellTool)(?:\(\s*\))?$/;
+
+/** Gemini CLI: MCP servers trusted to skip confirmations, and `tools.allowed` with the whole shell tool. */
+function checkGeminiSettings(file: ParsedFile): Finding[] {
+  if (!GEMINI_FILE.test(file.path)) return [];
+  const root = jsonTreeOf(file);
+  if (!root) return [];
+  const findings: Finding[] = [];
+  for (const server of mcpServers(file)) {
+    const trust = member(server.config, "trust");
+    if (trust?.kind !== "boolean" || trust.value !== true) continue;
+    findings.push(
+      findingAt(rule, file, {
+        offset: trust.start,
+        length: trust.end - trust.start,
+        severity: "medium",
+        confidence: "high",
+        message: `MCP server "${server.name}" is trusted ("trust": true): Gemini CLI runs its tools without asking. Remove it unless you wrote the server.`,
+      }),
+    );
+  }
+  const allowed = member(member(root, "tools"), "allowed");
+  if (allowed?.kind === "array") {
+    for (const item of allowed.items) {
+      const value = stringValue(item);
+      if (value === undefined || !GEMINI_WHOLE_SHELL.test(value.trim())) continue;
+      findings.push(
+        findingAt(rule, file, {
+          offset: item.start,
+          length: item.end - item.start,
+          severity: "high",
+          confidence: "high",
+          message: `tools.allowed lists "${value}": Gemini CLI runs any shell command without asking. Allow specific commands instead, e.g. "run_shell_command(npm test)".`,
+        }),
+      );
     }
   }
   return findings;

@@ -171,7 +171,7 @@ Other agents, with the same rules:
 |---|---|
 | Cursor | `.cursorrules`, `.cursor/rules/**/*.mdc`, `.cursor/commands/*.md`, `.cursor/mcp.json`, `.cursor/hooks.json` (and the scripts its hooks run) |
 | GitHub Copilot / VS Code | `.github/copilot-instructions.md`, `.github/instructions/*.instructions.md`, `.github/prompts/*.prompt.md`, `.github/chatmodes/*.chatmode.md`, `.github/agents/*.agent.md`, `.vscode/mcp.json` |
-| Gemini CLI | `GEMINI.md`, `.gemini/settings.json` (MCP servers), `.gemini/commands/**/*.toml`, extensions in `.gemini/extensions/*/` (`gemini-extension.json` MCP servers, `GEMINI.md`, `commands/`) |
+| Gemini CLI | `GEMINI.md` and the context files named by `context.fileName`, `.gemini/settings.json` (MCP servers, hooks and the scripts they run, `tools.allowed`, `trust`), `.gemini/commands/**/*.toml`, extensions in `.gemini/extensions/*/` (`gemini-extension.json` MCP servers, `GEMINI.md`, `commands/`) |
 | Windsurf | `.windsurfrules`, `.windsurf/rules/*.md`, `.windsurf/workflows/*.md` |
 | Cline | `.clinerules` (file or folder) |
 | Kiro | `.kiro/steering/*.md`, `.kiro/settings/mcp.json` |
@@ -184,7 +184,7 @@ With `--global`, the same agents' user-level configuration, and only these paths
 |---|---|
 | Claude Code | `~/.claude` (`CLAUDE.md`, `settings*.json`, `skills/`, `agents/`, `commands/`, `plugins/`), the `mcpServers` sections of `~/.claude.json` |
 | Cursor | `~/.cursor/mcp.json`, `~/.cursor/hooks.json` (hook scripts resolve from `~/.cursor/`), `~/.cursor/commands/`, `~/.cursor/skills/` |
-| Gemini CLI | `~/.gemini/settings.json`, `~/.gemini/GEMINI.md`, `~/.gemini/commands/`, `~/.gemini/extensions/` |
+| Gemini CLI | `~/.gemini/settings.json`, `~/.gemini/GEMINI.md` (and `~/.gemini/<name>` for the names in its `context.fileName`, which then count in the project too), `~/.gemini/commands/`, `~/.gemini/extensions/` |
 | Windsurf | `~/.codeium/windsurf/mcp_config.json`, `memories/global_rules.md`, `global_workflows/` |
 | Cline | `~/.cline/data/settings/cline_mcp_settings.json` (and the older copy in VS Code's `globalStorage/saoudrizwan.claude-dev/settings/`), `~/.cline/rules/`, `~/.cline/workflows/`, `~/.cline/skills/`, `~/Documents/Cline/Rules/` and `Workflows/` |
 | Kiro, Codex, shared | `~/.kiro/settings/mcp.json`, `~/.kiro/steering/`; `~/.codex/AGENTS.md`, `~/.codex/skills/`, `~/.codex/hooks.json`, `~/.codex/config.toml`; `~/.agents/AGENTS.md`, `~/.agents/skills/` |

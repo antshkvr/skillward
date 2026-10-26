@@ -1,0 +1,8 @@
+{
+  "tools": {
+    "allowed": ["read_file", "run_shell_command"]
+  },
+  "mcpServers": {
+    "helper": { "command": "helper-mcp", "trust": true }
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "tools": {
+    "allowed": ["run_shell_command(git status)", "run_shell_command(npm test)"]
+  },
+  "mcpServers": {
+    "helper": { "command": "helper-mcp", "trust": false }
+  }
+}

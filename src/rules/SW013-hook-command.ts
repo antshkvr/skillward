@@ -52,8 +52,8 @@ function loopbackOnly(command: string): boolean {
 const LOCAL_SCRIPT = new RegExp(
   String.raw`^(?:\w+=(?:"[^"]*"|'[^']*'|[^\s"'$]*)\s+)*` + // env assignments
     String.raw`(?:cmd(?:\.exe)?\s+/[cC]\s+)?` +
-    String.raw`(?:(?:/usr(?:/local)?/bin/|/bin/|/opt/homebrew/bin/)?(?:bash|sh|zsh|node|python3?|py|ruby|perl|tsx|bun(?:\s+run)?|deno\s+run(?:\s+-\w+)*|npx\s+tsx|uv\s+run(?:\s+--?[\w-]+)*(?:\s+python3?)?|(?:pwsh|powershell)(?:\.exe)?(?:\s+-\w+(?:\s+(?:Bypass|Unrestricted|RemoteSigned))?)*)\s+)?` +
-    String.raw`["']?(?:\$\{?CLAUDE_(?:PROJECT_DIR|PLUGIN_ROOT|SKILL_DIR)(?::-[^}]*)?\}?["']?[\\/]|\$\(git rev-parse --show-toplevel\)["']?[\\/]|\.{1,2}[\\/]|(?:\$HOME|\$\{HOME\}|~)[\\/]\.claude[\\/]|(?![/~$\\-])[\w.-]+[\\/])` +
+    String.raw`(?:["']?(?:/usr(?:/local)?/bin/|/bin/|/opt/homebrew/bin/)?(?:bash|sh|zsh|node|python3?|py|ruby|perl|tsx|bun(?:\s+run)?|deno\s+run(?:\s+-\w+)*|npx\s+tsx|uv\s+run(?:\s+--?[\w-]+)*(?:\s+python3?)?|(?:pwsh|powershell)(?:\.exe)?(?:\s+-\w+(?:\s+(?:Bypass|Unrestricted|RemoteSigned))?)*)["']?\s+)?` + // `'bun' x.ts`: a quoted interpreter too
+    String.raw`["']?(?:\$\{?(?:CLAUDE_(?:PROJECT_DIR|PLUGIN_ROOT|SKILL_DIR)|GEMINI_PROJECT_DIR)(?::-[^}]*)?\}?["']?[\\/]|\$\(git rev-parse --show-toplevel\)["']?[\\/]|\.{1,2}[\\/]|(?:\$HOME|\$\{HOME\}|~)[\\/]\.claude[\\/]|(?![/~$\\-])[\w.-]+[\\/])` +
     String.raw`[^\s"'|;&<>${"`"}()]*["']?` + // the script path
     String.raw`(?:\s+(?!-c\b|-e\b)[^\s|;&<>${"`"}()]+)*` + // plain arguments
     String.raw`(?:\s+2?>\s*/dev/null(?:\s+2>&1)?)?(?:\s*\|\|\s*(?:true|:|exit\s+0))?\s*$`,

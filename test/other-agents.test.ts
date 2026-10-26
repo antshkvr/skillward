@@ -41,7 +41,7 @@ describe("other agents: classification", () => {
     ["/p/.clinerules/coding.md", "instructions"],
     ["/p/.kiro/steering/product.md", "instructions"],
     ["/p/.kiro/settings/mcp.json", "mcp-config"],
-    ["/p/.gemini/settings.json", "mcp-config"],
+    ["/p/.gemini/settings.json", "settings"],
     ["/p/.gemini/commands/refactor/pure.toml", "instructions"],
   ])("%s → %s", (path, kind) => {
     expect(classifyFile(path, [])).toBe(kind);

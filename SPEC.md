@@ -144,12 +144,17 @@ discovery  →  parsers  →  rule engine  →  reporters
       `.github/prompts/**/*.prompt.md`, `.github/chatmodes/**/*.chatmode.md`, `.github/agents/**/*.md`; Windsurf
       `.windsurfrules`, `.windsurf/rules/**/*.md`, `.windsurf/workflows/**/*.md`; Cline `.clinerules` (a file, or
       `.clinerules/**/*.md`); Kiro `.kiro/steering/**/*.md`; Gemini CLI custom commands `.gemini/commands/**/*.toml`.
-    - `mcp-config`: `.cursor/mcp.json`, `.vscode/mcp.json` (servers under `servers`), `.gemini/settings.json`,
+    - `mcp-config`: `.cursor/mcp.json`, `.vscode/mcp.json` (servers under `servers`),
       `.kiro/settings/mcp.json`, Gemini CLI extension manifests `.gemini/extensions/<name>/gemini-extension.json`
       (installable third-party packages with their own `mcpServers`; an extension's `GEMINI.md` and
       `commands/**/*.toml` are `instructions`). Remote servers are named by `url`, Windsurf's `serverUrl` or Gemini's
       `httpUrl`.
-    - `settings`: Cursor hooks `.cursor/hooks.json` (`{"version": 1, "hooks": {event: [{"command": …}]}}`; scripts run
+    - `settings`: Gemini CLI `.gemini/settings.json` (MCP servers; hooks in the Claude Code shape, scripts run from the
+      project root and named with `$GEMINI_PROJECT_DIR`; `tools.allowed`; per-server `trust`). Its `context.fileName` (or
+      the older `contextFileName`), a name or a list of names, makes files with those names context files: they are
+      read as `instructions` wherever they are in the project, and with `--global` the names from
+      `~/.gemini/settings.json` count for the project too and `~/.gemini/<name>` is read. Only plain file names count.
+      Cursor hooks `.cursor/hooks.json` (`{"version": 1, "hooks": {event: [{"command": …}]}}`; scripts run
       from the project root); Codex hooks `.codex/hooks.json` (the Claude Code shape; a handler may add a Windows
       `commandWindows`; scripts run from the session's folder, the project root, and are usually named
       `"$(git rev-parse --show-toplevel)"/.codex/hooks/x.py`); Codex configuration `.codex/config.toml` (TOML; MCP
@@ -356,6 +361,9 @@ a prose mention without a command → medium; official installers of well-known 
   sandbox → `info` (nothing changes without asking). An MCP server's
   `default_tools_approval_mode = "auto"` → `medium` (its tools run without asking); one tool's `approval_mode = "auto"`
   → `low`.
+  Gemini CLI `settings.json`: an MCP server with `trust: true` → `medium` (its tool calls skip confirmation);
+  `tools.allowed` with the whole shell tool (`run_shell_command`, `ShellTool`, no command in parentheses) → `high`,
+  like `Bash(*)`; a scoped entry such as `run_shell_command(git status)` isn't reported.
 - SW009: explicit forms ("don't tell the user", "hide … from the user", "the user must not know") → `high`/`high` when
   the object is what the agent does ("about this", "what you did", end of clause); "don't tell the user *that X*"
   (advice on what not to claim) → `medium`. "Don't tell the user **to** …" isn't reported. "Without telling the user"
