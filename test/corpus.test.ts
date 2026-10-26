@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { classifyFile } from "../src/discovery/index.js";
 import {
   cohenKappa,
+  contextFilePaths,
   contextLines,
   isPortablePath,
   parseRepoLinks,
@@ -220,6 +221,24 @@ describe("corpus: selectHookScripts", () => {
     const named = [".claude/hooks/a.sh", "scripts/guard.sh", "scripts/guard.sh", "tools/bin/check", "missing.sh", "x/a:b.sh"];
     expect(selectHookScripts(tree, selected, named, { portable: true })).toEqual(["scripts/guard.sh", "tools/bin/check"]);
     expect(selectHookScripts(tree, selected, named)).toEqual(["scripts/guard.sh", "tools/bin/check", "x/a:b.sh"]);
+  });
+});
+
+describe("corpus: selectAgentFiles for Codex, Gemini and Cline", () => {
+  it("selects Codex config and hooks, Gemini settings and Cline hook scripts", () => {
+    const tree = [".codex/config.toml", ".codex/hooks.json", ".codex/notes.toml", ".gemini/settings.json", ".clinerules/hooks/PreToolUse", ".clinerules/hooks/notes.txt", "src/app.ts"];
+    expect(selectAgentFiles(tree, { maxFiles: 100, portable: true }).files.sort()).toEqual(
+      [".clinerules/hooks/PreToolUse", ".codex/config.toml", ".codex/hooks.json", ".gemini/settings.json"].sort(),
+    );
+  });
+});
+
+describe("corpus: contextFilePaths", () => {
+  it("finds the files Gemini context names point at, outside skipped folders, up to a cap", () => {
+    const tree = ["CONTEXT.md", "docs/CONTEXT.md", "node_modules/x/CONTEXT.md", "docs/OTHER.md", "a/.git/CONTEXT.md", "notCONTEXT.md"];
+    expect(contextFilePaths(tree, ["CONTEXT.md"])).toEqual(["CONTEXT.md", "docs/CONTEXT.md"]);
+    expect(contextFilePaths(tree, ["CONTEXT.md"], 1)).toEqual(["CONTEXT.md"]);
+    expect(contextFilePaths(tree, [])).toEqual([]);
   });
 });
 

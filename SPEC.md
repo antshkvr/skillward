@@ -586,10 +586,11 @@ publishing (OIDC, no token in the repository). A version already on npm is skipp
    files discovery reads are selected from the tree (`classifyFile` plus everything in skill folders, no binary
    extensions, files in hook folders) and only those are checked out (sparse). A second pass reads the checked-out hook
    files the way discovery does and also checks out the scripts their commands name (`scripts/guard.sh`,
-   `.github/setup.js`), so hook targets and SW017 are measured. At most `--max-files` (default 25,000) per repository,
+   `.github/setup.js`), so hook targets and SW017 are measured, and the files Gemini settings name in
+   `context.fileName` (at most 2,000). At most `--max-files` (default 25,000) per repository,
    agent files first. Third-party code never lands on disk in bulk. Hardening: no hooks, submodules or LFS filters,
    `core.symlinks=false`, no password prompts; paths that can't be created on Windows (and `.git` aliases) are
-   dropped. Metadata (commit SHA, file count, hook scripts, files over the cap, status) goes to `meta/`.
+   dropped. Metadata (commit SHA, file count, hook scripts, context files, files over the cap, status) goes to `meta/`.
 3. `npm run corpus:scan` — an in-process scan with audit settings: the repository's config and inline
    `skillward-ignore` are ignored, so a repository can't hide its own findings. Results: `results/<owner>__<repo>.json`
    (JSON report v1 + `repo`, `sha`), summary `summary.json`/`summary.md`, a review list `review-<severity>.md`.
@@ -661,8 +662,10 @@ fourth needs a rescan of the affected repositories):
 - [x] **Other agents:** Cursor, GitHub Copilot / VS Code, Gemini CLI, Windsurf, Cline, Kiro (project-level files).
 - [x] **Other agents, global:** Cursor, Gemini CLI (with extensions), Windsurf, Cline, Kiro and Codex user
   configuration in `--global`; SW012 reads Windsurf `serverUrl` and Gemini `httpUrl`.
-- [ ] **Other agents, next:** Cline hooks (`~/Documents/Cline/Hooks`, `.clinerules/hooks`: scripts that run
-  automatically); Gemini `settings.json` as `settings` (it can carry hooks and tool allowlists, so SW013/SW008 should
-  run on it — changes the project level too); Gemini `contextFileName`; Codex `config.toml` MCP servers (needs TOML);
-  Cline `autoApprove` and Gemini `trust: true` on MCP servers.
+- [x] **Other agents, next:** Codex `.codex/hooks.json` and `.codex/config.toml` (MCP servers, hooks, `notify`,
+  approval and sandbox settings; TOML with offsets); Gemini `settings.json` as `settings` (hooks, `trust`,
+  `tools.allowed`) and `context.fileName`; Cline hook scripts (`.clinerules/hooks`, `~/Documents/Cline/Hooks`) and
+  `autoApprove`. The corpus fetch selects these files; not measured on the full corpus yet.
+- [ ] **Other agents, later:** Antigravity CLI (replaced Gemini CLI on 2026-06-18) once its configuration is
+  documented; Cline SDK plugins; Gemini extension hooks.
 - [ ] **v0.2 sandbox:** container, proxy, honeytokens, agent run, tool-call logging, verdicts, report.

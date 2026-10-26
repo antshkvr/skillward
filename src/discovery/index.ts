@@ -359,7 +359,7 @@ const MAX_CONTEXT_NAMES = 20;
  * File names Gemini CLI loads as context, from `context.fileName` (or the older `contextFileName`): a name or a list.
  * Only plain names count, not paths. Unreadable or invalid settings give none.
  */
-async function geminiContextNames(settingsFiles: string[]): Promise<string[]> {
+export async function geminiContextNames(settingsFiles: string[]): Promise<string[]> {
   const names = new Set<string>();
   for (const path of settingsFiles) {
     let value: unknown;

@@ -3,10 +3,10 @@
 // filters, symlinks are checked out as plain files.
 import { rm } from "node:fs/promises";
 import { join, relative, sep } from "node:path";
-import { HOOK_FILE } from "../../src/discovery/index.js";
+import { geminiContextNames, HOOK_FILE } from "../../src/discovery/index.js";
 import { hookScriptPaths } from "../../src/discovery/hook-targets.js";
 import { run } from "./common.js";
-import { selectAgentFiles, selectHookScripts, sparsePattern } from "./lib.js";
+import { contextFilePaths, selectAgentFiles, selectHookScripts, sparsePattern } from "./lib.js";
 
 export interface FetchMeta {
   repo: string;
@@ -15,6 +15,8 @@ export interface FetchMeta {
   files?: number;
   /** Of `files`, scripts fetched because a hook command names them. */
   hookScripts?: number;
+  /** Of `files`, Gemini context files fetched because `context.fileName` names them. */
+  contextFiles?: number;
   truncated?: number;
   unportable?: number;
   error?: string;
@@ -80,9 +82,19 @@ export async function fetchRepo(repo: string, target: string, options: { maxFile
     for (const hook of await hookScriptPaths(join(target, file), target)) named.push(relative(target, hook.absPath).split(sep).join("/"));
   }
   const hookScripts = selectHookScripts(tree, selection.files, named, { portable: true });
-  if (hookScripts.length) {
-    const second = await checkout([...selection.files, ...hookScripts]);
+  // Gemini CLI loads the files its settings name in `context.fileName` as instructions, wherever they are.
+  const settings = selection.files.filter((f) => /(?:^|\/)\.gemini\/settings\.json$/.test(f)).map((f) => join(target, f));
+  const contextPaths = contextFilePaths(tree, await geminiContextNames(settings));
+  const contextFiles = selectHookScripts(tree, [...selection.files, ...hookScripts], contextPaths, { portable: true });
+  if (hookScripts.length || contextFiles.length) {
+    const second = await checkout([...selection.files, ...hookScripts, ...contextFiles]);
     if (second.code !== 0) return fail(`${second.step} (hook scripts)`, second.stderr);
   }
-  return { ...base, status: "ok", files: selection.files.length + hookScripts.length, hookScripts: hookScripts.length };
+  return {
+    ...base,
+    status: "ok",
+    files: selection.files.length + hookScripts.length + contextFiles.length,
+    hookScripts: hookScripts.length,
+    ...(contextFiles.length ? { contextFiles: contextFiles.length } : {}),
+  };
 }

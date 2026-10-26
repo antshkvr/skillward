@@ -180,6 +180,20 @@ export function selectHookScripts(tree: string[], selected: string[], scripts: s
   return out;
 }
 
+const SKIPPED_SEGMENT = /(?:^|\/)(?:node_modules|\.git|\.hg|\.svn|\.skillward)\//;
+
+/** Paths in the tree whose file name is one of Gemini's context file names (`context.fileName`), at most `max`. */
+export function contextFilePaths(tree: string[], names: string[], max = 2000): string[] {
+  if (names.length === 0) return [];
+  const wanted = new Set(names);
+  const out: string[] = [];
+  for (const p of tree) {
+    if (out.length >= max) break;
+    if (wanted.has(p.slice(p.lastIndexOf("/") + 1)) && !SKIPPED_SEGMENT.test(p)) out.push(p);
+  }
+  return out;
+}
+
 /** A non-cone sparse-checkout pattern that matches exactly this file. */
 export function sparsePattern(path: string): string {
   return "/" + path.replace(/[\\*?[\]!#]/g, (c) => "\\" + c).replace(/^ /, "\\ ").replace(/ $/, "\\ ");
