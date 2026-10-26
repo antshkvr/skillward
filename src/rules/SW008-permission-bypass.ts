@@ -1,6 +1,9 @@
+import { CODEX_CONFIG } from "../parsers/index.js";
+import { jsonTreeOf, member, type JsonNode } from "../parsers/json-tree.js";
 import type { Confidence, Finding, ParsedFile, Rule, Severity } from "../types.js";
 import { logicalLines } from "../text.js";
 import { findingAt } from "./helpers.js";
+import { mcpServers, stringValue } from "./json-config.js";
 import { APOS, isQuoted, isWarningContext, matchPhrases, phrase, stemPhrase, type PhrasePattern } from "./phrases.js";
 
 /** CLI flags and settings that turn approvals off. Exact strings, so confidence is high. */
@@ -131,7 +134,7 @@ const rule: Rule = {
   description:
     "Turning off approvals: --dangerously-skip-permissions, bypassPermissions mode, --yolo, unrestricted Bash allow rules, and instructions to skip confirmations or auto-approve (EN/RU).",
   check(target) {
-    return target.files.flatMap((file) => [...checkText(file), ...checkAllowList(file)]);
+    return target.files.flatMap((file) => [...checkText(file), ...checkAllowList(file), ...checkCodexConfig(file)]);
   },
 };
 
@@ -243,6 +246,73 @@ function checkAllowList(file: ParsedFile): Finding[] {
         confidence: "high",
       }),
     );
+  }
+  return findings;
+}
+
+/**
+ * Codex `config.toml`: `approval_policy = "never"` with `sandbox_mode = "danger-full-access"` is the config form of
+ * `--dangerously-bypass-approvals-and-sandbox`; either one alone still leaves a sandbox or the prompts. A profile
+ * inherits what it doesn't set from the top level. MCP servers can let their tools run without asking.
+ */
+function checkCodexConfig(file: ParsedFile): Finding[] {
+  if (!CODEX_CONFIG.test(file.path)) return [];
+  const root = jsonTreeOf(file);
+  if (!root) return [];
+  const findings: Finding[] = [];
+  const report = (node: JsonNode, severity: Severity, message: string) =>
+    findings.push(findingAt(rule, file, { offset: node.start, length: node.end - node.start, severity, confidence: "high", message }));
+
+  const never = (node: JsonNode | undefined) => stringValue(node) === "never";
+  const fullAccess = (node: JsonNode | undefined) => stringValue(node) === "danger-full-access";
+  /** `approval`/`sandbox`: set in this scope; `effectiveApproval`/`effectiveSandbox`: what applies, inherited or not. */
+  const scope = (approval: JsonNode | undefined, sandbox: JsonNode | undefined, effectiveApproval: JsonNode | undefined, effectiveSandbox: JsonNode | undefined, where: string) => {
+    if (never(effectiveApproval) && fullAccess(effectiveSandbox) && (never(approval) || fullAccess(sandbox))) {
+      report(
+        fullAccess(sandbox) ? sandbox! : approval!,
+        "high",
+        `Codex runs every command without asking and without a sandbox${where}: approval_policy = "never" with sandbox_mode = "danger-full-access", the same as --dangerously-bypass-approvals-and-sandbox. Remove one of them.`,
+      );
+      return;
+    }
+    if (never(approval)) {
+      // In a read-only sandbox a command that needs more just fails: nothing changes without asking.
+      if (stringValue(effectiveSandbox) === "read-only") {
+        report(approval!, "info", `approval_policy = "never"${where} with a read-only sandbox: Codex runs read-only commands without asking. Listed for inventory.`);
+      } else {
+        report(approval!, "medium", `approval_policy = "never"${where}: Codex runs commands without asking (they stay in the sandbox). Use "on-request" unless this is a non-interactive run.`);
+      }
+    }
+    if (fullAccess(sandbox)) {
+      report(sandbox!, "medium", `sandbox_mode = "danger-full-access"${where}: commands run without a sandbox, with full access to your files and the network. Use "workspace-write".`);
+    }
+  };
+
+  const topApproval = member(root, "approval_policy");
+  const topSandbox = member(root, "sandbox_mode");
+  scope(topApproval, topSandbox, topApproval, topSandbox, "");
+  const profiles = member(root, "profiles");
+  if (profiles?.kind === "object") {
+    for (const { key, value } of profiles.entries) {
+      const approval = member(value, "approval_policy");
+      const sandbox = member(value, "sandbox_mode");
+      scope(approval, sandbox, approval ?? topApproval, sandbox ?? topSandbox, ` in profile "${key}"`);
+    }
+  }
+
+  for (const server of mcpServers(file)) {
+    const mode = member(server.config, "default_tools_approval_mode");
+    if (stringValue(mode) === "auto") {
+      report(mode!, "medium", `MCP server "${server.name}" runs its tools without asking (default_tools_approval_mode = "auto"). Approve them one by one instead.`);
+    }
+    const tools = member(server.config, "tools");
+    if (tools?.kind !== "object") continue;
+    for (const { key, value } of tools.entries) {
+      const toolMode = member(value, "approval_mode");
+      if (stringValue(toolMode) === "auto") {
+        report(toolMode!, "low", `Tool "${key}" of MCP server "${server.name}" runs without asking (approval_mode = "auto"). Fine for read-only tools; check what it can change.`);
+      }
+    }
   }
   return findings;
 }

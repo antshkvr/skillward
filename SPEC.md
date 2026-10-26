@@ -152,7 +152,11 @@ discovery  →  parsers  →  rule engine  →  reporters
     - `settings`: Cursor hooks `.cursor/hooks.json` (`{"version": 1, "hooks": {event: [{"command": …}]}}`; scripts run
       from the project root); Codex hooks `.codex/hooks.json` (the Claude Code shape; a handler may add a Windows
       `commandWindows`; scripts run from the session's folder, the project root, and are usually named
-      `"$(git rev-parse --show-toplevel)"/.codex/hooks/x.py`).
+      `"$(git rev-parse --show-toplevel)"/.codex/hooks/x.py`); Codex configuration `.codex/config.toml` (TOML; MCP
+      servers in `[mcp_servers.<name>]` with `command`/`args`/`env`/`url`/`http_headers`, hooks in the same shape as
+      `hooks.json` as `[[hooks.<Event>]]` tables, the `notify` command run on every notification, and approval and
+      sandbox settings, top-level and per `[profiles.<name>]`). Codex loads a project's `.codex/config.toml` only in a
+      trusted project, but a trusted clone is the normal case.
     - These folders and files are agent configuration, so `.gitignore` doesn't hide them either (`.cursor/`,
       `.windsurf/`, `.gemini/`, `.kiro/`, `.clinerules/`, `.codex/`, and the root files above).
   It honors `.gitignore` (including nested ones) and the config's `ignore`, and never enters `node_modules`, `.git`,
@@ -179,7 +183,7 @@ discovery  →  parsers  →  rule engine  →  reporters
       `~/Documents/Cline/Rules/`, `~/Documents/Cline/Workflows/` (`*.md`, `instructions`); `~/.cline/skills/`;
       `~/.agents/AGENTS.md`, `~/.agents/skills/`.
     - Kiro: `~/.kiro/settings/mcp.json`, `~/.kiro/steering/`. Codex: `~/.codex/AGENTS.md`, `~/.codex/skills/`,
-      `~/.codex/hooks.json` (relative script paths resolve in `~/.codex/`).
+      `~/.codex/hooks.json` (relative script paths resolve in `~/.codex/`), `~/.codex/config.toml`.
   - Files over 2 MB and binary files (a NUL in the first 8 KB) are skipped and listed in `skipped`.
   - **Hook targets.** A command hook in a `settings` target or plugin hooks file that runs a local script
     (`node .github/setup.js`, `"${CLAUDE_PROJECT_DIR}"/.claude/hooks/x.sh`, `${CLAUDE_PLUGIN_ROOT}/hooks/run.sh`, `bash
@@ -193,7 +197,9 @@ discovery  →  parsers  →  rule engine  →  reporters
     when large or binary, to describe them (size, longest line, binary, obfuscation signals) for SW017; their content
     is scanned only if it fits the usual 2 MB text limit. Gitignore doesn't hide a referenced script.
 - **parsers** — markdown: frontmatter, body, extracted code blocks and HTML comments; JSON: a tree; scripts: text plus
-  a language from the extension or shebang.
+  a language from the extension or shebang. Codex `config.toml` is parsed as TOML (a library parses the values; a
+  linear scan of the text gives each key and value its offset) into the same positioned tree as JSON, so the config
+  rules read its keys as they are; other TOML files (Gemini commands) stay text.
 - **rule engine** — one module per rule:
   ```ts
   interface Rule {
@@ -344,6 +350,12 @@ a prose mention without a command → medium; official installers of well-known 
   true` → `medium`. `permissions.allow` with `Bash`, `Bash(*)`, `Bash(:*)`, `Bash(*:*)`, `PowerShell(*)` → `high`;
   narrow rules like `Bash(npm run test:*)` aren't reported. Phrases → `medium`; auto-approve-all and "answer yes to all
   prompts" → `high`. A governing warning ("Never run … with", "Don't use") → `info`; quoted examples → `low`.
+  Codex `config.toml`: `approval_policy = "never"` together with `sandbox_mode = "danger-full-access"` (top level, or in
+  a profile, which inherits the top level) → `high`, the same as `--dangerously-bypass-approvals-and-sandbox`; either
+  one alone → `medium` (no prompts but still sandboxed, or prompts but no sandbox); `"never"` with a `read-only`
+  sandbox → `info` (nothing changes without asking). An MCP server's
+  `default_tools_approval_mode = "auto"` → `medium` (its tools run without asking); one tool's `approval_mode = "auto"`
+  → `low`.
 - SW009: explicit forms ("don't tell the user", "hide … from the user", "the user must not know") → `high`/`high` when
   the object is what the agent does ("about this", "what you did", end of clause); "don't tell the user *that X*"
   (advice on what not to claim) → `medium`. "Don't tell the user **to** …" isn't reported. "Without telling the user"
@@ -358,12 +370,13 @@ a prose mention without a command → medium; official installers of well-known 
 - SW011: `npx`/`bunx`/`bun x`/`npm exec`, `pnpm dlx`/`yarn dlx`, `uvx`/`uv tool run`, `pipx run`, `docker`/`podman
   run`, including via `cmd /c` and as a single string without `args`. No version / `@latest` / dist-tag / git URL
   without SHA → `medium`; a version range → `low`; a docker tag other than `latest` → `info` (pin a digest).
-- SW012: every remote server (`url`, `serverUrl`, `httpUrl`) → `low` (host and auth header names, no values); `http://` to a non-local host or
+- SW012: every remote server (`url`, `serverUrl`, `httpUrl`) → `low` (host and auth header names from `headers` or Codex `http_headers`, no values); `http://` to a non-local host or
   credentials in the URL → `medium`. Loopback isn't reported; empty placeholders are skipped; `${VAR}` URLs are reported
   with their default host.
 - SW013: a hook that starts a script shipped with the project/plugin → `low`; inline shell, absolute or out-of-project
   paths → `medium`; network or secret paths → `high`; `statusLine` → `info` unless it shows the same signs. `type:
-  "http"` hooks: remote → `high`, loopback → `medium`. Secrets in messages and snippets are masked. Network and secret
+  "http"` hooks: remote → `high`, loopback → `medium`. Codex `notify` (a command and its arguments, run on every
+  notification) is listed like a hook. Secrets in messages and snippets are masked. Network and secret
   signs count only in what the hook runs, not in text it prints or matches: quoted `echo`/`printf` arguments (unless
   piped or redirected to a file, or holding `$(…)`/backticks), `grep` patterns and `case` patterns of guard hooks are
   left out. `curl`/`wget` that only reach loopback URLs → `medium` like loopback `http` hooks; `rsync` counts as

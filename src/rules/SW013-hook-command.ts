@@ -79,7 +79,7 @@ function checkFile(file: ParsedFile): Finding[] {
   return hooks.map((hook) => {
     const { severity, confidence, why } = assess(hook);
     const trigger =
-      hook.event === "statusLine" ? "Status line runs" : `Hook on ${hook.event}${hook.matcher ? ` (matcher "${hook.matcher}")` : ""} ${hook.type === "url" ? "posts to" : "runs"}`;
+      hook.event === "statusLine" ? "Status line runs" : hook.event === "notify" ? "Notification command runs" : `Hook on ${hook.event}${hook.matcher ? ` (matcher "${hook.matcher}")` : ""} ${hook.type === "url" ? "posts to" : "runs"}`;
     const finding = findingAt(rule, file, {
       offset: hook.offset,
       length: Math.min(hook.value.length + 2, 200),

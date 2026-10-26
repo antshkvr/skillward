@@ -1,4 +1,5 @@
 import { jsonTreeOf, member, type JsonNode, type JsonObject } from "../parsers/json-tree.js";
+import { CODEX_CONFIG } from "../parsers/index.js";
 import type { ParsedFile } from "../types.js";
 
 /** An MCP server entry in `mcpServers` (top-level, or per project in `~/.claude.json`). */
@@ -28,8 +29,9 @@ export function mcpServers(file: ParsedFile): McpServer[] {
     }
   };
   collect(member(root, "mcpServers"));
-  // VS Code / GitHub Copilot `.vscode/mcp.json` keeps them under `servers`.
+  // VS Code / GitHub Copilot `.vscode/mcp.json` keeps them under `servers`, Codex `config.toml` under `mcp_servers`.
   if (/(?:^|\/)\.vscode\/mcp\.json$/.test(file.path)) collect(member(root, "servers"));
+  if (CODEX_CONFIG.test(file.path)) collect(member(root, "mcp_servers"));
   const projects = member(root, "projects");
   if (projects?.kind === "object") {
     for (const p of projects.entries) collect(member(p.value, "mcpServers"), p.key);
@@ -84,7 +86,18 @@ export function hookCommands(file: ParsedFile): HookCommand[] {
   if (status?.kind === "string") {
     result.push({ event: "statusLine", type: "command", value: status.value as string, offset: status.start });
   }
+  // Codex runs `notify` (a program and its arguments) on every notification.
+  const notify = CODEX_CONFIG.test(file.path) ? member(root, "notify") : undefined;
+  if (notify?.kind === "array" && notify.items.length > 0 && notify.items.every((i) => i.kind === "string")) {
+    const value = notify.items.map((i) => quoteArg(stringValue(i)!)).join(" ");
+    result.push({ event: "notify", type: "command", value, offset: notify.start });
+  }
   return result;
+}
+
+/** An argument as a shell would read it: quoted when it has spaces or quotes. */
+function quoteArg(arg: string): string {
+  return /^[\w@%+=:,./-]+$/.test(arg) ? arg : `'${arg.replace(/'/g, `'\\''`)}'`;
 }
 
 /** Hooks declared in markdown frontmatter (skills and agents can carry `hooks:` in YAML). */
@@ -122,6 +135,8 @@ const SECRET_NAME = String.raw`[\w-]*(?:token|secret|password|passwd|pwd|api[_-]
 export function redactSecrets(text: string): string {
   return text
     .replace(new RegExp(String.raw`("${SECRET_NAME}"\s*:\s*")([^"]*)(")`, "gi"), (_, a: string, v: string, b: string) => a + mask(v) + b)
+    // TOML: `API_KEY = "…"`, `"api-token" = '…'`.
+    .replace(new RegExp(String.raw`((?<![\w-])["']?${SECRET_NAME}["']?\s*=\s*["'])([^"'\n]*)(["'])`, "gi"), (_, a: string, v: string, b: string) => a + mask(v) + b)
     .replace(new RegExp(String.raw`(\b${SECRET_NAME}=)([^\s"'&]+)`, "gi"), (_, a: string, v: string) => a + mask(v))
     .replace(new RegExp(String.raw`(--${SECRET_NAME}(?:=|"?\s*,?\s*"?\s*))([^\s"',]+)`, "gi"), (_, a: string, v: string) => a + mask(v))
     .replace(/(\bBearer\s+)([\w.~+/=-]+)/gi, (_, a: string, v: string) => a + mask(v))

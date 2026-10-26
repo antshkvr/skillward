@@ -46,7 +46,8 @@ function checkFile(file: ParsedFile): Finding[] {
       : (url?.host ?? "an unparseable URL");
     const where = server.project ? ` (project ${server.project})` : "";
 
-    const headers = member(server.config, "headers");
+    // Codex names them `http_headers`.
+    const headers = member(server.config, "headers") ?? member(server.config, "http_headers");
     const authHeaders = headers?.kind === "object" ? headers.entries.map((e) => e.key).filter((k) => AUTH_HEADER.test(k)) : [];
     const notes: string[] = [];
     if (authHeaders.length > 0) notes.push(`sends ${authHeaders.join(", ")} header(s)`);

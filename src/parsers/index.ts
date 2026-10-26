@@ -15,6 +15,10 @@ import {
 import { parseMarkdown } from "./markdown.js";
 import { describeScript } from "./script-shape.js";
 import { detectScriptLanguage } from "./script.js";
+import { parseTomlTree } from "./toml.js";
+
+/** Codex configuration: TOML, read as a config tree (other TOML files, such as Gemini commands, stay text). */
+export const CODEX_CONFIG = /(?:^|\/)\.codex\/config\.toml$/;
 
 /** Files above this size are skipped: agent instructions are small, and this bounds memory use. */
 export const MAX_FILE_BYTES = 2 * 1024 * 1024;
@@ -94,6 +98,17 @@ export function parseText(source: SourceFile, text: string): ParsedFile {
   if (ext === ".md" || ext === ".mdx" || ext === ".markdown" || ext === ".mdc") {
     file.type = "markdown";
     file.markdown = parseMarkdown(text, lineStarts);
+  } else if (CODEX_CONFIG.test(source.path)) {
+    // A JSON-shaped tree, so the config rules read MCP servers, hooks and settings as in JSON configs.
+    file.type = "json";
+    const parsed = parseTomlTree(text);
+    if ("tree" in parsed) {
+      file.json = { value: parsed.value };
+      setJsonTree(file, parsed.tree);
+    } else {
+      file.json = { error: parsed.error };
+      setJsonTree(file, null);
+    }
   } else if (name === CLAUDE_JSON) {
     file.type = "json";
     parseClaudeJson(file);

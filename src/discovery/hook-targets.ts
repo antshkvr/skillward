@@ -1,5 +1,6 @@
 import { lstat, readFile } from "node:fs/promises";
 import { basename, dirname, isAbsolute, relative, resolve, sep } from "node:path";
+import { parse } from "smol-toml";
 
 /** A local script that a hook command runs. */
 export interface HookTarget {
@@ -33,7 +34,9 @@ export async function hookTargets(file: string, scanRoot: string, home?: string)
 export async function hookScriptPaths(file: string, scanRoot: string, home?: string): Promise<HookTarget[]> {
   let value: unknown;
   try {
-    value = JSON.parse(await readFile(file, "utf8"));
+    const text = await readFile(file, "utf8");
+    // Codex `config.toml` declares hooks (and `notify`) in TOML; parsed as data, nothing is run.
+    value = file.endsWith(".toml") ? parse(text) : JSON.parse(text);
   } catch {
     return [];
   }
@@ -82,6 +85,10 @@ function commandsOf(value: unknown): Array<{ event: string; command: string }> {
   }
   const status = (obj.statusLine as { command?: unknown } | undefined)?.command;
   if (typeof status === "string") out.push({ event: "statusLine", command: status });
+  // Codex `notify = ["python3", "notify.py"]`: a program and its arguments.
+  if (Array.isArray(obj.notify) && obj.notify.length > 0 && obj.notify.every((a) => typeof a === "string")) {
+    out.push({ event: "notify", command: (obj.notify as string[]).map((a) => (/\s/.test(a) ? `"${a}"` : a)).join(" ") });
+  }
   return out;
 }
 

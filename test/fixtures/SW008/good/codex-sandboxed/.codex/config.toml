@@ -1,0 +1,7 @@
+model = "gpt-5"
+approval_policy = "on-request"
+sandbox_mode = "workspace-write"
+
+[profiles.ci]
+approval_policy = "never"
+sandbox_mode = "read-only"
