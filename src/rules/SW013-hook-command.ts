@@ -1,3 +1,4 @@
+import { clineHookEvent } from "../discovery/index.js";
 import type { Confidence, Finding, ParsedFile, Rule, Severity } from "../types.js";
 import { findingAt } from "./helpers.js";
 import { withVocab } from "./vocabulary.js";
@@ -75,7 +76,19 @@ const rule: Rule = {
 export default rule;
 
 function checkFile(file: ParsedFile): Finding[] {
-  const hooks = file.type === "json" ? hookCommands(file) : file.type === "markdown" ? frontmatterHookCommands(file) : [];
+  const clineEvent = file.hookTarget ? clineHookEvent(file.path) : undefined;
+  if (clineEvent) {
+    return [
+      findingAt(rule, file, {
+        offset: 0,
+        length: Math.min(file.text.indexOf("\n") === -1 ? file.text.length : file.text.indexOf("\n"), 200),
+        severity: "low",
+        confidence: "high",
+        message: `Cline runs this script on ${clineEvent} automatically (a hook). Its content is checked by the other rules; make sure you know what it does.`,
+      }),
+    ];
+  }
+  const hooks =file.type === "json" ? hookCommands(file) : file.type === "markdown" ? frontmatterHookCommands(file) : [];
   return hooks.map((hook) => {
     const { severity, confidence, why } = assess(hook);
     const trigger =

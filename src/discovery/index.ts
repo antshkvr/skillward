@@ -70,7 +70,7 @@ const GLOBAL_SOURCES: GlobalSource[] = [
     ...CLINE_MCP,
   })),
   { dir: ".cline", entries: ["rules", "workflows", "skills"], kinds: [[/^(?:rules|workflows)\/.+\.md$/, "instructions"]] },
-  { dir: "Documents/Cline", entries: ["Rules", "Workflows"], kinds: [[/^(?:Rules|Workflows)\/.+\.md$/, "instructions"]] },
+  { dir: "Documents/Cline", entries: ["Rules", "Workflows", "Hooks"], kinds: [[/^(?:Rules|Workflows)\/.+\.md$/, "instructions"]] },
   { dir: ".agents", entries: ["AGENTS.md", "skills"] },
   { dir: ".kiro", entries: ["settings", "steering"] },
   { dir: ".codex", entries: ["AGENTS.md", "skills", "hooks.json", "config.toml"] },
@@ -319,6 +319,9 @@ function classify(
       continue;
     }
     const source: SourceFile = { absPath: file.absPath, path: file.path };
+    // A Cline hook is a script named after its event: it is its own hook target.
+    const clineEvent = clineHookEvent(file.classifyPath);
+    if (clineEvent && !skill) source.hookTarget = { events: [clineEvent], from: file.path };
     if (skill) {
       let target = skills.get(skill.dir);
       if (!target) {
@@ -337,6 +340,15 @@ function classify(
 function parentDisplay(path: string): string {
   const idx = path.lastIndexOf("/");
   return idx === -1 ? "." : path.slice(0, idx);
+}
+
+/** Cline hooks: an executable named after the event (`.ps1` on Windows), in the project or the user's Cline folder. */
+const CLINE_HOOK =
+  /(?:^|\/)(?:\.clinerules\/hooks|Documents\/Cline\/(?:Rules\/)?Hooks)\/(TaskStart|TaskResume|TaskCancel|TaskComplete|PreToolUse|PostToolUse|UserPromptSubmit|PreCompact)(?:\.ps1)?$/;
+
+/** The event of a Cline hook script, by its forward-slash path; undefined for other files. */
+export function clineHookEvent(path: string): string | undefined {
+  return CLINE_HOOK.exec(path)?.[1];
 }
 
 const GEMINI_SETTINGS = /\/\.gemini\/settings\.json$/;
@@ -392,6 +404,7 @@ export function classifyFile(path: string, pluginRoots: string[]): TargetKind | 
   if (/\/\.claude\/(commands|agents)\/.+\.md$/.test(path)) return "instructions";
   if (OTHER_AGENT_INSTRUCTIONS.some((re) => re.test(path))) return "instructions";
   if (/\/\.(?:cursor|vscode)\/mcp\.json$|\/\.kiro\/settings\/mcp\.json$/.test(path)) return "mcp-config";
+  if (clineHookEvent(path)) return "settings";
   // Gemini CLI settings carry hooks and tool allowlists next to MCP servers.
   if (/\/\.gemini\/settings\.json$/.test(path)) return "settings";
   // Gemini CLI extensions are installable third-party packages that bring their own MCP servers.

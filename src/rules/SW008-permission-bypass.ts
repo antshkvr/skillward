@@ -134,7 +134,7 @@ const rule: Rule = {
   description:
     "Turning off approvals: --dangerously-skip-permissions, bypassPermissions mode, --yolo, unrestricted Bash allow rules, and instructions to skip confirmations or auto-approve (EN/RU).",
   check(target) {
-    return target.files.flatMap((file) => [...checkText(file), ...checkAllowList(file), ...checkCodexConfig(file), ...checkGeminiSettings(file)]);
+    return target.files.flatMap((file) => [...checkText(file), ...checkAllowList(file), ...checkCodexConfig(file), ...checkGeminiSettings(file), ...checkAutoApprove(file)]);
   },
 };
 
@@ -355,6 +355,29 @@ function checkGeminiSettings(file: ParsedFile): Finding[] {
         }),
       );
     }
+  }
+  return findings;
+}
+
+/** Cline `autoApprove` (Roo Code `alwaysAllow`) on an MCP server: those tools run without asking. */
+function checkAutoApprove(file: ParsedFile): Finding[] {
+  if (file.type !== "json") return [];
+  const findings: Finding[] = [];
+  for (const server of mcpServers(file)) {
+    const list = member(server.config, "autoApprove") ?? member(server.config, "alwaysAllow");
+    if (list?.kind !== "array") continue;
+    const tools = list.items.map(stringValue).filter((t): t is string => t !== undefined);
+    if (tools.length === 0) continue;
+    const named = tools.length > 6 ? `${tools.slice(0, 6).join(", ")} and ${tools.length - 6} more` : tools.join(", ");
+    findings.push(
+      findingAt(rule, file, {
+        offset: list.start,
+        length: Math.min(list.end - list.start, 200),
+        severity: "low",
+        confidence: "high",
+        message: `MCP server "${server.name}" runs these tools without asking: ${named}. Fine for read-only tools; check what the others can change.`,
+      }),
+    );
   }
   return findings;
 }

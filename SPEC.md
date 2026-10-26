@@ -154,6 +154,10 @@ discovery  →  parsers  →  rule engine  →  reporters
       the older `contextFileName`), a name or a list of names, makes files with those names context files: they are
       read as `instructions` wherever they are in the project, and with `--global` the names from
       `~/.gemini/settings.json` count for the project too and `~/.gemini/<name>` is read. Only plain file names count.
+      Cline hooks: an executable named after the event in `.clinerules/hooks/` (`PreToolUse`, `PostToolUse`,
+      `UserPromptSubmit`, `TaskStart`, `TaskResume`, `TaskCancel`, `TaskComplete`, `PreCompact`; no extension, or
+      `.ps1` on Windows) is the hook itself: each is a `settings` target of one hook script (SW017 and every rule read
+      it; SW013 lists it as `low`).
       Cursor hooks `.cursor/hooks.json` (`{"version": 1, "hooks": {event: [{"command": …}]}}`; scripts run
       from the project root); Codex hooks `.codex/hooks.json` (the Claude Code shape; a handler may add a Windows
       `commandWindows`; scripts run from the session's folder, the project root, and are usually named
@@ -185,7 +189,8 @@ discovery  →  parsers  →  rule engine  →  reporters
     - Cline: `~/.cline/data/settings/cline_mcp_settings.json` and, from older versions, the VS Code extension's
       `User/globalStorage/saoudrizwan.claude-dev/settings/cline_mcp_settings.json` (under `AppData/Roaming/Code`,
       `Library/Application Support/Code` or `.config/Code`) as `mcp-config`; `~/.cline/rules/`, `~/.cline/workflows/`,
-      `~/Documents/Cline/Rules/`, `~/Documents/Cline/Workflows/` (`*.md`, `instructions`); `~/.cline/skills/`;
+      `~/Documents/Cline/Rules/`, `~/Documents/Cline/Workflows/` (`*.md`, `instructions`); global hooks in
+      `~/Documents/Cline/Hooks/` (and `~/Documents/Cline/Rules/Hooks/` from older versions); `~/.cline/skills/`;
       `~/.agents/AGENTS.md`, `~/.agents/skills/`.
     - Kiro: `~/.kiro/settings/mcp.json`, `~/.kiro/steering/`. Codex: `~/.codex/AGENTS.md`, `~/.codex/skills/`,
       `~/.codex/hooks.json` (relative script paths resolve in `~/.codex/`), `~/.codex/config.toml`.
@@ -363,7 +368,8 @@ a prose mention without a command → medium; official installers of well-known 
   → `low`.
   Gemini CLI `settings.json`: an MCP server with `trust: true` → `medium` (its tool calls skip confirmation);
   `tools.allowed` with the whole shell tool (`run_shell_command`, `ShellTool`, no command in parentheses) → `high`,
-  like `Bash(*)`; a scoped entry such as `run_shell_command(git status)` isn't reported.
+  like `Bash(*)`; a scoped entry such as `run_shell_command(git status)` isn't reported. An MCP server's `autoApprove`
+  (Cline) or `alwaysAllow` list → `low`, naming the tools that run without asking.
 - SW009: explicit forms ("don't tell the user", "hide … from the user", "the user must not know") → `high`/`high` when
   the object is what the agent does ("about this", "what you did", end of clause); "don't tell the user *that X*"
   (advice on what not to claim) → `medium`. "Don't tell the user **to** …" isn't reported. "Without telling the user"
