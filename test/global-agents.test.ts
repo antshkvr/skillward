@@ -55,6 +55,7 @@ function home(): string {
     ".kiro/steering/product.md": "# product",
     ".codex/AGENTS.md": "# codex",
     ".codex/skills/x/SKILL.md": SKILL,
+    ".codex/hooks.json": "{}",
     ".codex/sessions/1/AGENTS.md": "# session log",
   });
 }
@@ -75,6 +76,7 @@ describe("--global: other agents' user configuration", () => {
       "mcp-config ~/.codeium/windsurf/mcp_config.json",
       "skill ~/.codex/skills/x",
       "instructions ~/.codex/AGENTS.md",
+      "settings ~/.codex/hooks.json",
       "skill ~/.cursor/skills/c",
       "instructions ~/.cursor/commands/review.md",
       "settings ~/.cursor/hooks.json",

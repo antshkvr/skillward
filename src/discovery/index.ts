@@ -36,7 +36,7 @@ const ALWAYS_SKIPPED_DIRS = new Set(["node_modules", ".git", ".hg", ".svn", ".sk
  * Agent configuration that is often gitignored on purpose (local settings and memory) but is still
  * loaded by the agent, so `.gitignore` does not hide it from the scan. Config `ignore` still applies.
  */
-const AGENT_DIRS = new Set([".claude", ".claude-plugin", ".cursor", ".windsurf", ".gemini", ".kiro", ".clinerules"]);
+const AGENT_DIRS = new Set([".claude", ".claude-plugin", ".cursor", ".windsurf", ".gemini", ".kiro", ".clinerules", ".codex"]);
 /** Instruction files recognized by name at any depth (Claude Code, AGENTS.md, Gemini CLI, Cursor, Windsurf, Cline). */
 const INSTRUCTION_FILES = new Set(["CLAUDE.md", "CLAUDE.local.md", "AGENTS.md", "GEMINI.md", ".cursorrules", ".windsurfrules", ".clinerules"]);
 const GITIGNORE_EXEMPT_FILES = new Set([...INSTRUCTION_FILES, ".mcp.json"]);
@@ -73,7 +73,7 @@ const GLOBAL_SOURCES: GlobalSource[] = [
   { dir: "Documents/Cline", entries: ["Rules", "Workflows"], kinds: [[/^(?:Rules|Workflows)\/.+\.md$/, "instructions"]] },
   { dir: ".agents", entries: ["AGENTS.md", "skills"] },
   { dir: ".kiro", entries: ["settings", "steering"] },
-  { dir: ".codex", entries: ["AGENTS.md", "skills"] },
+  { dir: ".codex", entries: ["AGENTS.md", "skills", "hooks.json"] },
 ];
 
 /** A folder global files came from: hook scripts of its files resolve inside it and display under its prefix. */
@@ -153,7 +153,7 @@ export async function discover(options: DiscoveryOptions): Promise<DiscoveryResu
 }
 
 /** Files whose `hooks` (and `statusLine`) commands can name local scripts; matched on forward-slash paths. */
-export const HOOK_FILE = /(?:^|\/)(?:\.claude\/settings(?:\.local)?\.json|hooks\/hooks\.json|\.claude-plugin\/plugin\.json|\.cursor\/hooks\.json)$/;
+export const HOOK_FILE = /(?:^|\/)(?:\.claude\/settings(?:\.local)?\.json|hooks\/hooks\.json|\.claude-plugin\/plugin\.json|\.cursor\/hooks\.json|\.codex\/hooks\.json)$/;
 
 /**
  * Adds the local scripts that hooks run to the hook file's target (see SPEC, "Hook targets"), so their content is
@@ -349,7 +349,7 @@ export function classifyFile(path: string, pluginRoots: string[]): TargetKind | 
   if (/\/\.(?:cursor|vscode)\/mcp\.json$|\/\.gemini\/settings\.json$|\/\.kiro\/settings\/mcp\.json$/.test(path)) return "mcp-config";
   // Gemini CLI extensions are installable third-party packages that bring their own MCP servers.
   if (/\/\.gemini\/extensions\/[^/]+\/gemini-extension\.json$/.test(path)) return "mcp-config";
-  if (/\/\.cursor\/hooks\.json$/.test(path)) return "settings";
+  if (/\/\.(?:cursor|codex)\/hooks\.json$/.test(path)) return "settings";
   if (name === ".mcp.json" || name === ".claude.json") return "mcp-config";
   if (/\/\.claude\/settings(\.local)?\.json$/.test(path)) return "settings";
   if (/\/\.claude-plugin\/(plugin|marketplace)\.json$/.test(path)) return "plugin-manifest";

@@ -1,5 +1,5 @@
 import { lstat, readFile } from "node:fs/promises";
-import { dirname, isAbsolute, relative, resolve, sep } from "node:path";
+import { basename, dirname, isAbsolute, relative, resolve, sep } from "node:path";
 
 /** A local script that a hook command runs. */
 export interface HookTarget {
@@ -52,11 +52,11 @@ export async function hookScriptPaths(file: string, scanRoot: string, home?: str
 /** `<project>/.claude/settings.json` → `<project>`; `<plugin>/hooks/hooks.json` and `.claude-plugin/plugin.json` → `<plugin>`. */
 function baseDirFor(file: string, home?: string): string {
   const dir = dirname(file);
-  // Cursor runs user hooks (`~/.cursor/hooks.json`) from `~/.cursor`.
-  if (home !== undefined && dir === resolve(home, ".cursor")) return dir;
+  // Cursor runs user hooks (`~/.cursor/hooks.json`) from `~/.cursor`; relative paths in `~/.codex/hooks.json` are read there too.
+  if (home !== undefined && (dir === resolve(home, ".cursor") || dir === resolve(home, ".codex"))) return dir;
   const name = dir.split(sep).pop();
-  // Cursor runs project hooks from the project root too (`.cursor/hooks/x.sh` paths).
-  return name === ".claude" || name === "hooks" || name === ".claude-plugin" || name === ".cursor" ? dirname(dir) : dir;
+  // Cursor and Codex run project hooks from the project root (`.cursor/hooks/x.sh`, `.codex/hooks/x.py` paths).
+  return name === ".claude" || name === "hooks" || name === ".claude-plugin" || name === ".cursor" || name === ".codex" ? dirname(dir) : dir;
 }
 
 function commandsOf(value: unknown): Array<{ event: string; command: string }> {
@@ -69,13 +69,13 @@ function commandsOf(value: unknown): Array<{ event: string; command: string }> {
       if (!Array.isArray(groups)) continue;
       for (const group of groups) {
         // Cursor: `{event: [{command}]}`; Claude Code: `{event: [{matcher, hooks: [{command}]}]}`.
-        const direct = (group as { command?: unknown })?.command;
-        if (typeof direct === "string") out.push({ event, command: direct });
         const list = (group as { hooks?: unknown })?.hooks;
-        if (!Array.isArray(list)) continue;
-        for (const hook of list) {
-          const command = (hook as { command?: unknown })?.command;
-          if (typeof command === "string") out.push({ event, command });
+        for (const hook of [group, ...(Array.isArray(list) ? list : [])]) {
+          // Codex handlers may add a Windows-only `commandWindows`.
+          for (const key of ["command", "commandWindows"]) {
+            const command = (hook as Record<string, unknown> | undefined)?.[key];
+            if (typeof command === "string") out.push({ event, command });
+          }
         }
       }
     }
@@ -88,7 +88,9 @@ function commandsOf(value: unknown): Array<{ event: string; command: string }> {
 /** The first argument that names a local script, with `$CLAUDE_PROJECT_DIR` / `$CLAUDE_PLUGIN_ROOT` substituted. */
 export function scriptPath(command: string, base: string, home?: string): string | undefined {
   // Only the first command of a pipeline/list: that's what runs first and what reviewers look at.
-  const first = command.split(/\s*(?:&&|\|\||[;|])\s*/)[0] ?? "";
+  // Codex names repo-local hooks from the git root: `"$(git rev-parse --show-toplevel)/.codex/hooks/x.py"`.
+  const rooted = command.replace(/\$\(\s*git rev-parse --show-toplevel\s*\)/g, ".");
+  const first = rooted.split(/\s*(?:&&|\|\||[;|])\s*/)[0] ?? "";
   const words = tokenize(first);
   for (const raw of words) {
     if (/^[A-Za-z_][A-Za-z0-9_]*=/.test(raw)) continue; // VAR=value
@@ -97,7 +99,8 @@ export function scriptPath(command: string, base: string, home?: string): string
       .replace(/^%CLAUDE_PROJECT_DIR%|^%CLAUDE_PLUGIN_ROOT%/i, ".");
     if (home) word = word.replace(/^(?:~|\$HOME|\$\{HOME\})(?=\/)/, home.split("\\").join("/"));
     if (word.startsWith("-") || /^\/[a-z]$/i.test(word)) continue; // options, incl. `cmd /c`
-    if (RUNNERS.has(word.toLowerCase())) continue;
+    // `/usr/bin/python3 x.py`, `/usr/bin/env node x.mjs`: an interpreter named by its path is still an interpreter.
+    if (RUNNERS.has(word.toLowerCase()) || (word.includes("/") && RUNNERS.has(basename(word).toLowerCase()))) continue;
     if (/[$`*?]|^~/.test(word)) return undefined; // a variable or glob: not resolvable statically
     // Absolute paths are kept; hookTargets() drops the ones outside the scan root.
     if (isAbsolute(word) || /^[A-Za-z]:[\\/]/.test(word)) return resolve(word);

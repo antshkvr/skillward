@@ -48,6 +48,7 @@ describe("SW013 hook-command", () => {
     "uv run ${CLAUDE_PLUGIN_ROOT}/hooks/stop.py",
     "powershell -NoProfile -ExecutionPolicy Bypass -File .claude/hooks/guard.ps1",
     "bash ${CLAUDE_SKILL_DIR}/bin/check-freeze.sh 2>/dev/null || true",
+    '/usr/bin/python3 "$(git rev-parse --show-toplevel)/.codex/hooks/check_cmd.py"',
   ])("lists hooks that only start a shipped script as low: %s", (command) => {
     const [f] = check(hook(command));
     expect(f).toMatchObject({ severity: "low", confidence: "high" });
@@ -58,7 +59,7 @@ describe("SW013 hook-command", () => {
     'sh -c "echo hi"',
     'node -e "require(1)"',
     "cat | jq -r .tool_input.file_path | xargs npx prettier --write",
-    "bash $(git rev-parse --show-toplevel)/x.sh",
+    "bash $(dirname $(pwd))/x.sh",
     "/usr/bin/bash -c x",
     "/opt/tools/hook.sh",
     "bash ~/bin/hook.sh",

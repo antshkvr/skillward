@@ -31,6 +31,9 @@ describe("scriptPath", () => {
     ["python3 -u tools/lint.py && echo done", "tools/lint.py"],
     ["./hooks/notify", "hooks/notify"],
     ["cmd /c hooks\\run.bat", "hooks\\run.bat"],
+    ['/usr/bin/python3 "$(git rev-parse --show-toplevel)/.codex/hooks/check_cmd.py"', ".codex/hooks/check_cmd.py"],
+    ['bash "$(git rev-parse --show-toplevel)"/.codex/hooks/stop.sh', ".codex/hooks/stop.sh"],
+    ["/usr/bin/env node scripts/hook.mjs", "scripts/hook.mjs"],
   ])("%s → %s", (command, expected) => {
     expect(scriptPath(command, base)).toBe(resolve(base, expected));
   });

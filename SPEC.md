@@ -150,9 +150,11 @@ discovery  →  parsers  →  rule engine  →  reporters
       `commands/**/*.toml` are `instructions`). Remote servers are named by `url`, Windsurf's `serverUrl` or Gemini's
       `httpUrl`.
     - `settings`: Cursor hooks `.cursor/hooks.json` (`{"version": 1, "hooks": {event: [{"command": …}]}}`; scripts run
-      from the project root).
+      from the project root); Codex hooks `.codex/hooks.json` (the Claude Code shape; a handler may add a Windows
+      `commandWindows`; scripts run from the session's folder, the project root, and are usually named
+      `"$(git rev-parse --show-toplevel)"/.codex/hooks/x.py`).
     - These folders and files are agent configuration, so `.gitignore` doesn't hide them either (`.cursor/`,
-      `.windsurf/`, `.gemini/`, `.kiro/`, `.clinerules/`, and the root files above).
+      `.windsurf/`, `.gemini/`, `.kiro/`, `.clinerules/`, `.codex/`, and the root files above).
   It honors `.gitignore` (including nested ones) and the config's `ignore`, and never enters `node_modules`, `.git`,
   `.hg`, `.svn`, `.skillward`.
   - **`.gitignore` exception:** the contents of `.claude/`, `.claude-plugin/` and the files `CLAUDE.md`,
@@ -176,11 +178,14 @@ discovery  →  parsers  →  rule engine  →  reporters
       `Library/Application Support/Code` or `.config/Code`) as `mcp-config`; `~/.cline/rules/`, `~/.cline/workflows/`,
       `~/Documents/Cline/Rules/`, `~/Documents/Cline/Workflows/` (`*.md`, `instructions`); `~/.cline/skills/`;
       `~/.agents/AGENTS.md`, `~/.agents/skills/`.
-    - Kiro: `~/.kiro/settings/mcp.json`, `~/.kiro/steering/`. Codex: `~/.codex/AGENTS.md`, `~/.codex/skills/`.
+    - Kiro: `~/.kiro/settings/mcp.json`, `~/.kiro/steering/`. Codex: `~/.codex/AGENTS.md`, `~/.codex/skills/`,
+      `~/.codex/hooks.json` (relative script paths resolve in `~/.codex/`).
   - Files over 2 MB and binary files (a NUL in the first 8 KB) are skipped and listed in `skipped`.
   - **Hook targets.** A command hook in a `settings` target or plugin hooks file that runs a local script
     (`node .github/setup.js`, `"${CLAUDE_PROJECT_DIR}"/.claude/hooks/x.sh`, `${CLAUDE_PLUGIN_ROOT}/hooks/run.sh`, `bash
     scripts/x.sh`) adds that script to the same target: every rule scans its content, `lock` pins it, `explain` counts it.
+    `$(git rev-parse --show-toplevel)` is the project root; an interpreter named by absolute path
+    (`/usr/bin/python3 x.py`) is skipped like a bare one.
     The path is resolved against the project (the folder holding `.claude/`) or the plugin root, must stay inside the
     scan root, is never a symlink, and a file already in another target isn't added twice; a script that belongs to a
     skill stays in the skill (under its skill-relative name in the lockfile) and is marked as a hook target there, so

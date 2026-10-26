@@ -175,7 +175,8 @@ Other agents, with the same rules:
 | Windsurf | `.windsurfrules`, `.windsurf/rules/*.md`, `.windsurf/workflows/*.md` |
 | Cline | `.clinerules` (file or folder) |
 | Kiro | `.kiro/steering/*.md`, `.kiro/settings/mcp.json` |
-| Codex, others | `AGENTS.md`; skills in any folder with a `SKILL.md` (`.agents/skills`, `.codex/skills`, `.cursor/skills`, …) |
+| Codex | `AGENTS.md`, `.codex/hooks.json` (and the scripts its hooks run) |
+| Others | skills in any folder with a `SKILL.md` (`.agents/skills`, `.codex/skills`, `.cursor/skills`, …) |
 
 With `--global`, the same agents' user-level configuration, and only these paths in the home directory:
 
@@ -186,9 +187,9 @@ With `--global`, the same agents' user-level configuration, and only these paths
 | Gemini CLI | `~/.gemini/settings.json`, `~/.gemini/GEMINI.md`, `~/.gemini/commands/`, `~/.gemini/extensions/` |
 | Windsurf | `~/.codeium/windsurf/mcp_config.json`, `memories/global_rules.md`, `global_workflows/` |
 | Cline | `~/.cline/data/settings/cline_mcp_settings.json` (and the older copy in VS Code's `globalStorage/saoudrizwan.claude-dev/settings/`), `~/.cline/rules/`, `~/.cline/workflows/`, `~/.cline/skills/`, `~/Documents/Cline/Rules/` and `Workflows/` |
-| Kiro, Codex, shared | `~/.kiro/settings/mcp.json`, `~/.kiro/steering/`; `~/.codex/AGENTS.md`, `~/.codex/skills/`; `~/.agents/AGENTS.md`, `~/.agents/skills/` |
+| Kiro, Codex, shared | `~/.kiro/settings/mcp.json`, `~/.kiro/steering/`; `~/.codex/AGENTS.md`, `~/.codex/skills/`, `~/.codex/hooks.json`; `~/.agents/AGENTS.md`, `~/.agents/skills/` |
 
-Scripts that hooks run (`node .github/setup.js`, `"$CLAUDE_PROJECT_DIR"/.claude/hooks/check.sh`, `${CLAUDE_PLUGIN_ROOT}/hooks/run.sh`) are added to the hook file's target when they live inside the scanned folder (a script inside a skill folder stays in the skill): their content is scanned, `lock` pins them, and SW017 flags the ones that can't be reviewed.
+Scripts that hooks run (`node .github/setup.js`, `"$CLAUDE_PROJECT_DIR"/.claude/hooks/check.sh`, `${CLAUDE_PLUGIN_ROOT}/hooks/run.sh`, `"$(git rev-parse --show-toplevel)/.codex/hooks/x.py"`) are added to the hook file's target when they live inside the scanned folder (a script inside a skill folder stays in the skill): their content is scanned, `lock` pins them, and SW017 flags the ones that can't be reviewed.
 
 `.gitignore` files are respected — except for agent configuration (`.claude/`, `.claude-plugin/`, `CLAUDE*.md`, `AGENTS.md`, `.mcp.json`), which is often gitignored on purpose but still loaded by the agent. `node_modules`, VCS folders and `.skillward/` are never entered. Binary files and files over 2 MB are skipped and listed in the report.
 

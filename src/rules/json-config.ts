@@ -68,8 +68,9 @@ export function hookCommands(file: ParsedFile): HookCommand[] {
         const list = member(group, "hooks");
         const items = list?.kind === "array" ? list.items : member(group, "command") ? [group] : [];
         for (const hook of items) {
-          for (const type of ["command", "url"] as const) {
-            const node = member(hook, type);
+          // Codex handlers may add a Windows-only `commandWindows`, a command of its own.
+          for (const [key, type] of [["command", "command"], ["commandWindows", "command"], ["url", "url"]] as const) {
+            const node = member(hook, key);
             if (node?.kind === "string") {
               result.push({ event, ...(matcher ? { matcher } : {}), type, value: node.value as string, offset: node.start });
             }
