@@ -10,6 +10,7 @@
 - `--global` (scan, explain, lock, verify) also reads other agents' user configuration, only at known paths: Cursor (`~/.cursor/mcp.json`, `hooks.json` with the scripts it runs, `commands/`, `skills/`), Gemini CLI (`~/.gemini/settings.json`, `GEMINI.md`, `commands/`, `extensions/`), Windsurf (`~/.codeium/windsurf/mcp_config.json`, global rules and workflows), Cline (MCP settings, also the older VS Code copy; rules, workflows, skills), Kiro, Codex and `~/.agents`. If you use `lock --global` (or the `SessionStart` hook with `verify --global`), the first `verify` after upgrading lists these files as added and scans them; review them, then run `lock --global`.
 - Gemini CLI extensions (`.gemini/extensions/*/gemini-extension.json`, their `GEMINI.md` and commands) are scanned in projects too.
 - SW012 recognizes remote MCP servers named by Windsurf's `serverUrl` and Gemini CLI's `httpUrl`.
+- SW013: network and secret signs count only in what a hook runs. Guard hooks that block `.env` or `curl -X POST` by matching tool input (`grep` and `case` patterns), and URLs or tool names in text a hook only prints, are `medium`, not `high`. `curl`/`wget` to a loopback server is `medium`, like loopback `http` hooks; a local `rsync` no longer counts as network. In the corpus this moves 16 of 22 `high` SW013 findings to `medium`; printed text that runs (`$(…)`, piped into a shell, written to a file) and files a guard reads stay `high`.
 
 ## 0.1.3 — 2026-10-23
 

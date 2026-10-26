@@ -358,7 +358,11 @@ a prose mention without a command → medium; official installers of well-known 
   with their default host.
 - SW013: a hook that starts a script shipped with the project/plugin → `low`; inline shell, absolute or out-of-project
   paths → `medium`; network or secret paths → `high`; `statusLine` → `info` unless it shows the same signs. `type:
-  "http"` hooks: remote → `high`, loopback → `medium`. Secrets in messages and snippets are masked.
+  "http"` hooks: remote → `high`, loopback → `medium`. Secrets in messages and snippets are masked. Network and secret
+  signs count only in what the hook runs, not in text it prints or matches: quoted `echo`/`printf` arguments (unless
+  piped or redirected to a file, or holding `$(…)`/backticks), `grep` patterns and `case` patterns of guard hooks are
+  left out. `curl`/`wget` that only reach loopback URLs → `medium` like loopback `http` hooks; `rsync` counts as
+  network only with a remote (`host:path`, `rsync://`).
 - SW014: needs a write to the path (redirect, `tee`, `cp`/`mv`/`ln`, `sed -i`, `writeFile`, `open(…, 'a'|'w')`, prose
   "append/add/write … to"). Persistence by itself: `crontab -`, `launchctl load|bootstrap`, `schtasks /create`,
   `Register-ScheduledTask`, `reg add …\Run`, `authorized_keys`, global `~/.claude` settings/hooks → `high`; shell rc

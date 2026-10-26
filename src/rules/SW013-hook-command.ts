@@ -4,11 +4,45 @@ import { withVocab } from "./vocabulary.js";
 import { frontmatterHookCommands, hookCommands, redactSecrets, shorten, type HookCommand } from "./json-config.js";
 import { checkLine as secretAccess } from "./SW005-secret-path-access.js";
 
-/** Network tools and remote URLs. `ssh` must not match inside `~/.ssh`. */
+/** Network tools and remote URLs. `ssh` must not match inside `~/.ssh`; `rsync` only with a remote (`host:path`, `rsync://`). */
 const NETWORK = withVocab(
-  /(?<![\w./-])(?:curl|wget|nc|ncat|netcat|socat|telnet|ftp|sftp|scp|ssh|rsync|__psFetch__|__psBits__)(?![\w.-])|\/dev\/(?:tcp|udp)\/|\bhttps?:\/\/(?!(?:localhost|127\.0\.0\.1|\[::1\])(?:[:/]|$))/i,
+  /(?<![\w./-])(?:curl|wget|nc|ncat|netcat|socat|telnet|ftp|sftp|scp|ssh|__psFetch__|__psBits__)(?![\w.-])|\/dev\/(?:tcp|udp)\/|\bhttps?:\/\/(?!(?:localhost|127\.0\.0\.1|\[::1\])(?:[:/]|$))|(?<![\w./-])rsync\b[^|;&]*?(?:rsync:\/\/|\s["']?(?:[\w.-]+@)?\w[\w.-]*::?[~/\w])/i,
 );
 const LOOPBACK_URL = /^https?:\/\/(?:localhost|127(?:\.\d{1,3}){3}|\[::1\])(?:[:/]|$)/i;
+const LOOPBACK_URLS = /\bhttps?:\/\/(?:localhost|127(?:\.\d{1,3}){3}|\[::1\])(?=[:/\s"']|$)/gi;
+const CURL_WGET = /(?<![\w./-])(?:curl|wget)(?![\w.-])/gi;
+
+const QUOTED = String.raw`(?:"(?:[^"\\]|\\.)*"|'[^']*')`;
+/** Command substitution: quoted text holding it runs. */
+const RUNS = /\$\(|`/;
+const PRINT = new RegExp(String.raw`\b(?:echo|printf)(?:\s+-[a-zA-Z]+)*((?:\s+${QUOTED})+)`, "g");
+/** What may follow a print whose output only goes to the terminal or the agent (not a pipe or a file). */
+const PRINT_END = /^\s*(?:(?:[12]?>&[12]|[12]?>\s*\/dev\/null)\s*)*(?:;|&&|\|\||\n|$)/;
+const GREP_PATTERN = new RegExp(String.raw`\b(?:grep|egrep|rg)(?:\s+-[a-zA-Z]+)*\s+(${QUOTED})`, "g");
+const CASE_WORD = String.raw`(?:[^\s;()|\\]|\\.)+`;
+const CASE_PATTERNS = new RegExp(String.raw`(\bin|;;)\s*\(?(${CASE_WORD}(?:\s*\|\s*${CASE_WORD})*)\s*\)`, "g");
+
+/**
+ * The parts of a hook command that run: quoted text it only prints, and the patterns a guard hook matches tool input
+ * against (`grep -E '\.env'`, `case … in *curl*)`), are blanked so they don't count as network or secret access.
+ */
+function executedPart(command: string): string {
+  let out = command.replace(PRINT, (m: string, args: string, offset: number, all: string) =>
+    RUNS.test(args) || !PRINT_END.test(all.slice(offset + m.length)) ? m : `${m.slice(0, m.length - args.length)} ""`,
+  );
+  out = out.replace(GREP_PATTERN, (m: string, pattern: string) => (RUNS.test(pattern) ? m : `${m.slice(0, m.length - pattern.length)}""`));
+  if (/\bcase\b/.test(out)) {
+    out = out.replace(CASE_PATTERNS, (m: string, lead: string, patterns: string) => (RUNS.test(patterns) ? m : `${lead} _)`));
+  }
+  return out;
+}
+
+/** `curl`/`wget` that only reach a server on this machine: every call has a loopback URL and nothing else is remote. */
+function loopbackOnly(command: string): boolean {
+  const tools = command.match(CURL_WGET)?.length ?? 0;
+  const loopback = command.match(LOOPBACK_URLS)?.length ?? 0;
+  return tools > 0 && loopback >= tools && !NETWORK.test(command.replace(LOOPBACK_URLS, " ").replace(CURL_WGET, " "));
+}
 
 /**
  * A hook that only starts a script shipped with the project, plugin or skill (`bash ${CLAUDE_PLUGIN_ROOT}/hooks/x.sh`,
@@ -63,10 +97,13 @@ function assess(hook: HookCommand): { severity: Severity; confidence: Confidence
       ? { severity: "medium", confidence: "high", why: "Hook event data (tool inputs, prompts) is sent to a local server." }
       : { severity: "high", confidence: "high", why: "Hook event data (tool inputs, prompts) leaves the machine. Make sure you trust this endpoint." };
   }
-  if (NETWORK.test(hook.value)) {
-    return { severity: "high", confidence: "high", why: "It reaches the network automatically, without asking. Review it or remove it." };
+  const executed = executedPart(hook.value);
+  if (NETWORK.test(executed)) {
+    return loopbackOnly(executed)
+      ? { severity: "medium", confidence: "high", why: "It sends data to a server on this machine (localhost) automatically; make sure you know what listens there." }
+      : { severity: "high", confidence: "high", why: "It reaches the network automatically, without asking. Review it or remove it." };
   }
-  if (secretAccess(hook.value).some((h) => h.severity !== "info")) {
+  if (secretAccess(executed).some((h) => h.severity !== "info")) {
     return { severity: "high", confidence: "high", why: "It touches credential files automatically, without asking. Review it or remove it." };
   }
   if (hook.event === "statusLine") {
